@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS public.admin_audit_log (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     admin_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     action TEXT NOT NULL CHECK (action IN ('approve', 'reject', 'delete', 'dismiss_flags')),
     target_id BIGINT,
