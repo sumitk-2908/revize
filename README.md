@@ -296,6 +296,7 @@ Do not commit `.env`, `.env.*`, `*.env`, service-role keys, private signing keys
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL used by browser, server, proxy, and E2E setup clients |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Public Supabase anon key; database permissions remain enforced by RLS |
 | `NEXT_PUBLIC_API_URL` | Yes | Base URL of the FastAPI service, for example `http://localhost:8000` |
+| `NEXT_PUBLIC_R2_PUBLIC_URL` | Yes | Public R2 base URL for PDFs and thumbnails; must match the backend's `R2_PUBLIC_URL`. Read at build time to derive the CSP and image allow-lists, so the build fails if it is absent |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Canonical metadata base URL; the app has a hosted fallback in code |
 | `NEXT_PUBLIC_SITE_URL` | Recommended | Sitemap and robots base URL; defaults to `http://localhost:3000` |
 | `PLAYWRIGHT_TEST_BASE_URL` | E2E only | Overrides the Playwright target URL |
