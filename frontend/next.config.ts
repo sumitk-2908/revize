@@ -18,12 +18,47 @@ const withPWA = withPWAInit({
   },
 });
 
+const R2_ORIGIN = "https://pub-11c1374f05774b54a2ab6c8bc83d6f7f.r2.dev";
+
+// Derive CSP origins from the same env vars the client uses, so the allow-list
+// can never drift from the project/backend the app actually talks to.
+const toOrigin = (value: string | undefined) => {
+  if (!value) return "";
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "";
+  }
+};
+
+const supabaseOrigin = toOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const supabaseSocketOrigin = supabaseOrigin.replace(/^http/, "ws");
+const apiOrigin = toOrigin(process.env.NEXT_PUBLIC_API_URL);
+
+if (!supabaseOrigin) {
+  throw new Error(
+    "NEXT_PUBLIC_SUPABASE_URL is missing or invalid; the CSP would block all Supabase requests."
+  );
+}
+
+const connectSrc = [
+  "'self'",
+  supabaseOrigin,
+  supabaseSocketOrigin,
+  apiOrigin,
+  process.env.NODE_ENV === "production" ? "" : "http://localhost:8000",
+  "https://*.ingest.us.sentry.io",
+  R2_ORIGIN,
+].filter(Boolean).join(" ");
+
+const imgSrc = ["'self'", "blob:", "data:", R2_ORIGIN, supabaseOrigin].join(" ");
+
 const cspHeader = `
     default-src 'self';
     script-src 'self' 'unsafe-eval' 'unsafe-inline' https://vercel.live;
     style-src 'self' 'unsafe-inline';
-    img-src 'self' blob: data: https://pub-11c1374f05774b54a2ab6c8bc83d6f7f.r2.dev https://dyxymzyijinfouqzjfls.supabase.co;
-    connect-src 'self' https://dyxymzyijinfouqzjfls.supabase.co wss://dyxymzyijinfouqzjfls.supabase.co https://academic-portal-backend-kt25.onrender.com https://academic-portal-api-yu0d.onrender.com http://localhost:8000 https://*.ingest.us.sentry.io https://pub-11c1374f05774b54a2ab6c8bc83d6f7f.r2.dev;
+    img-src ${imgSrc};
+    connect-src ${connectSrc};
     worker-src 'self' blob:;
     font-src 'self';
     object-src 'none';
@@ -50,7 +85,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'dyxymzyijinfouqzjfls.supabase.co',
+        hostname: new URL(supabaseOrigin).hostname,
         port: '',
         pathname: '/**',
       }
@@ -63,7 +98,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: cspHeader.replace(/\n/g, ''),
+            value: cspHeader.replace(/\s{2,}/g, ' ').trim(),
           },
         ],
       },
