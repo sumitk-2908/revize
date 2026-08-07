@@ -18,8 +18,6 @@ const withPWA = withPWAInit({
   },
 });
 
-const R2_ORIGIN = "https://pub-11c1374f05774b54a2ab6c8bc83d6f7f.r2.dev";
-
 // Derive CSP origins from the same env vars the client uses, so the allow-list
 // can never drift from the project/backend the app actually talks to.
 const toOrigin = (value: string | undefined) => {
@@ -35,9 +33,21 @@ const supabaseOrigin = toOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const supabaseSocketOrigin = supabaseOrigin.replace(/^http/, "ws");
 const apiOrigin = toOrigin(process.env.NEXT_PUBLIC_API_URL);
 
+// Documents live in Cloudflare R2. This origin was previously hardcoded and had
+// drifted to a bucket that no longer holds the files, so connect-src silently
+// blocked every PDF fetch and blob download. Derive it from env like the rest.
+const r2Origin = toOrigin(process.env.NEXT_PUBLIC_R2_PUBLIC_URL);
+
 if (!supabaseOrigin) {
   throw new Error(
     "NEXT_PUBLIC_SUPABASE_URL is missing or invalid; the CSP would block all Supabase requests."
+  );
+}
+
+if (!r2Origin) {
+  throw new Error(
+    "NEXT_PUBLIC_R2_PUBLIC_URL is missing or invalid; the CSP would block all PDF views and downloads. " +
+      "Set it to the same value as the backend's R2_PUBLIC_URL (e.g. https://pub-xxxx.r2.dev)."
   );
 }
 
@@ -48,10 +58,10 @@ const connectSrc = [
   apiOrigin,
   process.env.NODE_ENV === "production" ? "" : "http://localhost:8000",
   "https://*.ingest.us.sentry.io",
-  R2_ORIGIN,
+  r2Origin,
 ].filter(Boolean).join(" ");
 
-const imgSrc = ["'self'", "blob:", "data:", R2_ORIGIN, supabaseOrigin].join(" ");
+const imgSrc = ["'self'", "blob:", "data:", r2Origin, supabaseOrigin].join(" ");
 
 const cspHeader = `
     default-src 'self';
@@ -79,7 +89,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'pub-11c1374f05774b54a2ab6c8bc83d6f7f.r2.dev', // Replace with your exact R2 public domain
+        hostname: new URL(r2Origin).hostname,
         port: '',
         pathname: '/**',
       },

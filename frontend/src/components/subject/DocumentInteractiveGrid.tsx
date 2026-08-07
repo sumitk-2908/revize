@@ -249,7 +249,7 @@ export default function DocumentInteractiveGrid({
       window.URL.revokeObjectURL(localUrl);
     } catch (error) {
       console.error("Download failed:", error);
-      alert("Failed to download document. Ensure CORS is configured.");
+      dispatchToast("Download Failed", "Could not fetch the file from storage. Please try again.", "error");
     } finally {
       setTimeout(() => {
         setDownloadingIds((prev) => prev.filter((id) => id !== doc.id));
