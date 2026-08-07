@@ -32,26 +32,33 @@ function AdminPortalLoginContent() {
         return;
       }
 
-      const { data: factorsData } = await supabase.auth.mfa.listFactors();
-      const totpFactor = factorsData?.totp[0];
+      try {
+        const { data: factorsData } = await supabase.auth.mfa.listFactors();
+        // listFactors() only populates `totp` with verified factors; unverified
+        // ones are in `all`, and must be cleared or re-enrollment collides.
+        const totpFactor = factorsData?.all?.find((f) => f.factor_type === "totp");
 
-      if (!totpFactor || totpFactor.status !== "verified") {
-        if (totpFactor) await supabase.auth.mfa.unenroll({ factorId: totpFactor.id });
+        if (!totpFactor || totpFactor.status !== "verified") {
+          if (totpFactor) await supabase.auth.mfa.unenroll({ factorId: totpFactor.id });
 
-        const { data: enrollData, error } = await supabase.auth.mfa.enroll({ factorType: "totp" });
-        if (error) {
-          setToast({ open: true, message: "MFA Setup Error: " + error.message, type: "error" });
-          return;
+          const { data: enrollData, error } = await supabase.auth.mfa.enroll({
+            factorType: "totp",
+            friendlyName: `admin-totp-${Date.now()}`,
+          });
+          if (error) throw error;
+
+          setFactorId(enrollData.id);
+          setQrCode(enrollData.totp.qr_code);
+          setStep("MFA_SETUP");
+        } else {
+          setFactorId(totpFactor.id);
+          setStep("MFA_VERIFY");
         }
-        setFactorId(enrollData.id);
-        setQrCode(enrollData.totp.qr_code);
-        setStep("MFA_SETUP");
-      } else {
-        setFactorId(totpFactor.id);
-        setStep("MFA_VERIFY");
+      } catch (err: any) {
+        setToast({ open: true, message: "MFA Setup Error: " + err.message, type: "error" });
+      } finally {
+        setIsChecking(false);
       }
-
-      setIsChecking(false);
     };
 
     initializeMFA();
@@ -101,9 +108,9 @@ function AdminPortalLoginContent() {
           {step === "MFA_SETUP" && (
             <div className="flex flex-col items-center space-y-6">
               <div className="rounded-xl border-4 border-white bg-surface p-2 shadow-sm">
-                <img 
-                  src={`data:image/svg+xml;utf8,${encodeURIComponent(qrCode)}`} 
-                  alt="MFA Setup QR Code" 
+                <img
+                  src={qrCode}
+                  alt="MFA Setup QR Code"
                   className="size-48 bg-white"
                 />
               </div>
