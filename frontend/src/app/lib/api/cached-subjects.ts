@@ -58,7 +58,7 @@ export const getCachedSubjectCounts = unstable_cache(
 export const getCachedModuleCounts = unstable_cache(
   async (subjectName: string) => {
     const supabase = createPublicClient();
-    const { data: countData, error } = await supabase.rpc('get_module_counts', { p_subject: subjectName } as any);
+    const { data: countData, error } = await supabase.rpc('get_module_counts', { p_subject: subjectName });
     if (error) throw error;
 
     const moduleCounts: Record<number, number> = {};

@@ -668,7 +668,7 @@ export type Database = {
         }[]
       }
       get_module_counts: {
-        Args: { p_subject_id: number }
+        Args: { p_subject: string }
         Returns: {
           count: number
           module_id: number
