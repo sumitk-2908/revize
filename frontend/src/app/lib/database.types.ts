@@ -35,6 +35,27 @@ export type Database = {
         }
         Relationships: []
       }
+      branches: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: number
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: number
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
       degrees: {
         Row: {
           created_at: string | null
@@ -406,6 +427,8 @@ export type Database = {
           preferred_branch: string | null
           full_name: string | null
           academic_year: string | null
+          branch_id: number | null
+          year_of_study: number | null
         }
         Insert: {
           favorite_subjects?: string[] | null
@@ -413,6 +436,8 @@ export type Database = {
           preferred_branch?: string | null
           full_name?: string | null
           academic_year?: string | null
+          branch_id?: number | null
+          year_of_study?: number | null
         }
         Update: {
           favorite_subjects?: string[] | null
@@ -420,8 +445,18 @@ export type Database = {
           preferred_branch?: string | null
           full_name?: string | null
           academic_year?: string | null
+          branch_id?: number | null
+          year_of_study?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       semesters: {
         Row: {
@@ -556,6 +591,45 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      subject_offerings: {
+        Row: {
+          branch_id: number | null
+          created_at: string | null
+          id: number
+          subject_id: number
+          year: number
+        }
+        Insert: {
+          branch_id?: number | null
+          created_at?: string | null
+          id?: number
+          subject_id: number
+          year: number
+        }
+        Update: {
+          branch_id?: number | null
+          created_at?: string | null
+          id?: number
+          subject_id?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subject_offerings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subject_offerings_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subjects: {
         Row: {

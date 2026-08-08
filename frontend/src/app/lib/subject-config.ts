@@ -1,17 +1,29 @@
-import { 
-  Calculator, 
-  Atom, 
-  Terminal, 
-  Leaf, 
-  Wrench, 
-  Beaker, 
-  Zap, 
-  PenTool, 
-  BookOpen, 
-  MessageSquare, 
-  Globe, 
-  Users 
+import {
+  Calculator,
+  Atom,
+  Terminal,
+  Leaf,
+  Wrench,
+  Beaker,
+  Zap,
+  PenTool,
+  BookOpen,
+  MessageSquare,
+  Globe,
+  Users
 } from "lucide-react";
+
+// Academic years a subject can be offered in, and that a student can belong to.
+export const ACADEMIC_YEARS = [
+  { value: 1, label: "1st year" },
+  { value: 2, label: "2nd year" },
+  { value: 3, label: "3rd year" },
+  { value: 4, label: "4th year" },
+  { value: 5, label: "5th year" },
+] as const;
+
+export const getYearLabel = (year: number | null) =>
+  ACADEMIC_YEARS.find(y => y.value === year)?.label ?? "";
 
 // Categorized strictly into the 5 semantic global tokens:
 // Primary (Indigo), Success (Emerald), Warning (Amber), Destructive (Red), Muted (Zinc)

@@ -1,11 +1,11 @@
 import { unstable_cache } from 'next/cache';
 import { createPublicClient } from '@/utils/supabase/public';
-import type { Subject, Module } from './subjects';
+import { SUBJECT_SELECT, type Branch, type Subject, type Module } from './subjects';
 
 export const getCachedSubjects = unstable_cache(
   async () => {
     const supabase = createPublicClient();
-    const { data, error } = await supabase.from('subjects').select('*').order('name');
+    const { data, error } = await supabase.from('subjects').select(SUBJECT_SELECT).order('name');
     if (error) throw error;
     return data as Subject[];
   },
@@ -13,10 +13,21 @@ export const getCachedSubjects = unstable_cache(
   { revalidate: 86400, tags: ['subjects'] }
 );
 
+export const getCachedBranches = unstable_cache(
+  async () => {
+    const supabase = createPublicClient();
+    const { data, error } = await supabase.from('branches').select('*').order('code');
+    if (error) throw error;
+    return data as Branch[];
+  },
+  ['all-branches'],
+  { revalidate: 86400, tags: ['subjects'] }
+);
+
 export const getCachedSubjectBySlug = unstable_cache(
   async (slug: string) => {
     const supabase = createPublicClient();
-    const { data, error } = await supabase.from('subjects').select('*').eq('slug', slug).maybeSingle();
+    const { data, error } = await supabase.from('subjects').select(SUBJECT_SELECT).eq('slug', slug).maybeSingle();
     if (error) throw error;
     return data as Subject | null;
   },

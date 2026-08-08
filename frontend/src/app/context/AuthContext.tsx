@@ -13,6 +13,8 @@ export interface UserProfile {
   preferred_branch: string | null;
   favorite_subjects: string[] | null;
   academic_year: string | null;
+  branch_id: number | null;
+  year_of_study: number | null;
 }
 
 interface AuthContextType {
@@ -65,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authLoading, setAuthLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const [userProfile, setUserProfile] = useState<UserProfile>({ full_name: null, preferred_branch: null, favorite_subjects: null, academic_year: null });
+  const [userProfile, setUserProfile] = useState<UserProfile>({ full_name: null, preferred_branch: null, favorite_subjects: null, academic_year: null, branch_id: null, year_of_study: null });
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [showProfileGate, setShowProfileGate] = useState(false);
   const [uploadedBy, setUploadedBy] = useState("");
@@ -95,9 +97,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsAdmin(true); setIsStudent(false);
       } else {
         setIsAdmin(false); setIsStudent(true);
-        const { data: profileData } = await supabase.from('profiles').select('full_name, preferred_branch, favorite_subjects, academic_year').eq('id', session.user.id).single();
+        const { data: profileData } = await supabase.from('profiles').select('full_name, preferred_branch, favorite_subjects, academic_year, branch_id, year_of_study').eq('id', session.user.id).single();
         if (profileData) {
-          setUserProfile({ full_name: profileData.full_name, preferred_branch: profileData.preferred_branch, favorite_subjects: profileData.favorite_subjects, academic_year: profileData.academic_year });
+          setUserProfile({ full_name: profileData.full_name, preferred_branch: profileData.preferred_branch, favorite_subjects: profileData.favorite_subjects, academic_year: profileData.academic_year, branch_id: profileData.branch_id, year_of_study: profileData.year_of_study });
           setUploadedBy(profileData.full_name || "Student");
           if (!profileData.full_name && !sessionStorage.getItem(`skipped_onboarding_${session.user.id}`)) {
             setShowOnboardingModal(true);
@@ -111,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } else {
       setIsAdmin(false); setIsStudent(false);
-      setUserProfile({ full_name: null, preferred_branch: null, favorite_subjects: null, academic_year: null });
+      setUserProfile({ full_name: null, preferred_branch: null, favorite_subjects: null, academic_year: null, branch_id: null, year_of_study: null });
       setUploadedBy("");
     }
   }, []);

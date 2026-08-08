@@ -1,5 +1,6 @@
 import { supabase } from "@/app/lib/api/core";
-import { getCachedSubjectBySlug, getCachedModules, getCachedModuleCounts } from "@/app/lib/api/cached-subjects";
+import { getCachedSubjectBySlug, getCachedModules, getCachedModuleCounts, getCachedBranches } from "@/app/lib/api/cached-subjects";
+import { getYearLabel } from "@/app/lib/subject-config";
 import SubjectTabs from "@/components/subject/SubjectTabs";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { Metadata } from "next";
@@ -45,13 +46,31 @@ async function SubjectTabsFetcher({ subjectSlug, displayTitle }: { subjectSlug: 
     moduleCounts = await getCachedModuleCounts(dbSubject.name);
   }
 
+  const branches = await getCachedBranches();
+  const offerings = [...(dbSubject.subject_offerings || [])]
+    .sort((a, b) => a.year - b.year || (a.branch_id ?? -1) - (b.branch_id ?? -1));
+
   return (
-    <SubjectTabs
-      subjectDetails={{ ...dbSubject, is_non_module: dbSubject.is_non_module ?? false }}
-      modules={modules}
-      moduleCounts={moduleCounts}
-      subjectSlug={subjectSlug}
-    />
+    <>
+      {offerings.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {offerings.map(o => (
+            <span
+              key={`${o.branch_id ?? "all"}-${o.year}`}
+              className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary"
+            >
+              {o.branch_id === null ? "All branches" : branches.find(b => b.id === o.branch_id)?.code || "Unknown"} · {getYearLabel(o.year)}
+            </span>
+          ))}
+        </div>
+      )}
+      <SubjectTabs
+        subjectDetails={{ ...dbSubject, is_non_module: dbSubject.is_non_module ?? false }}
+        modules={modules}
+        moduleCounts={moduleCounts}
+        subjectSlug={subjectSlug}
+      />
+    </>
   );
 }
 

@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { Edit, GraduationCap, BookOpen, X, Flame, Search } from "lucide-react";
 import { getProfilePreferences, updateProfilePreferences } from "@/app/lib/api/profile";
 import { InlineSpinner } from "@/components/layout/SharedLayouts";
-import { useSubjects } from "@/app/hooks/useSubjects";
+import { useSubjects, useBranches } from "@/app/hooks/useSubjects";
+import { ACADEMIC_YEARS, getYearLabel } from "@/app/lib/subject-config";
 import { useRouter, useSearchParams } from "next/navigation";
 import { dispatchToast } from "@/app/lib/toast";
 
@@ -14,14 +15,15 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { data: subjects = [] } = useSubjects();
-  
+  const { data: branches = [] } = useBranches();
+
   const email = user?.email || "No email provided";
   const avatarUrl = user?.user_metadata?.avatar_url;
-  
+
   // Preference States
   const [fullName, setFullName] = useState("");
-  const [branch, setBranch] = useState("");
-  const [academicYear, setAcademicYear] = useState("");
+  const [branchId, setBranchId] = useState<number | null>(null);
+  const [year, setYear] = useState<number | null>(null);
   const [favoriteSubjects, setFavoriteSubjects] = useState<string[]>([]);
   const [subjectQuery, setSubjectQuery] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -45,8 +47,8 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
     if (user?.id) {
       getProfilePreferences(user.id).then(data => {
         if (data) {
-          setBranch(data.preferred_branch || "");
-          setAcademicYear(data.academic_year || "");
+          setBranchId(data.branch_id ?? null);
+          setYear(data.year_of_study ?? null);
           setFavoriteSubjects(data.favorite_subjects || []);
           setFullName(data.full_name || "Student");
         } else {
@@ -60,8 +62,8 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
     if (isEditModalOpen && user?.id) {
       getProfilePreferences(user.id).then(data => {
         if (data) {
-          setBranch(data.preferred_branch || "");
-          setAcademicYear(data.academic_year || "");
+          setBranchId(data.branch_id ?? null);
+          setYear(data.year_of_study ?? null);
           setFavoriteSubjects(data.favorite_subjects || []);
           if (data.full_name) setFullName(data.full_name);
         }
@@ -116,24 +118,28 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id || !fullName.trim()) return;
-    if ((branch && !academicYear) || (!branch && academicYear)) {
+    if ((branchId && !year) || (!branchId && year)) {
       setErrorMsg("If you provide a branch, you must also provide your year, and vice versa.");
       return;
     }
     setErrorMsg("");
     setIsSaving(true);
     try {
+      const branchCode = branches.find(b => b.id === branchId)?.code || null;
       const updates = {
         full_name: fullName.trim(),
-        preferred_branch: branch || undefined,
-        academic_year: academicYear || undefined,
+        branch_id: branchId,
+        year_of_study: year,
+        // Legacy text columns kept in sync for the sidebar label and recommendations.
+        preferred_branch: branchCode,
+        academic_year: year ? getYearLabel(year) : null,
         favorite_subjects: favoriteSubjects
       };
       await updateProfilePreferences(user.id, updates);
-      
+
       // Dispatch event to update layout context
       window.dispatchEvent(new CustomEvent("portal_profile_update", { detail: updates }));
-      
+
       setIsEditModalOpen(false);
     } catch (error) {
       dispatchToast("Error", "Failed to save preferences.", "error");
@@ -180,7 +186,7 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
             
             <p className="mb-3 text-sm font-medium text-muted">{email}</p>
             <div className="flex flex-wrap justify-center gap-3 text-sm font-medium text-muted sm:justify-start sm:gap-4">
-              <span className="flex items-center gap-1.5"><GraduationCap size={14} aria-hidden="true"/> {branch || "Academic Portal"}</span>
+              <span className="flex items-center gap-1.5"><GraduationCap size={14} aria-hidden="true"/> {[branches.find(b => b.id === branchId)?.code, getYearLabel(year)].filter(Boolean).join(" · ") || "Academic Portal"}</span>
               <span className="flex items-center gap-1.5"><BookOpen size={14} aria-hidden="true"/> Student Account</span>
             </div>
           </div>
@@ -231,25 +237,27 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
                 {errorMsg && <p className="text-sm font-semibold text-destructive">{errorMsg}</p>}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="branchInput" className="mb-2 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Preferred Branch / Course</label>
-                    <input 
+                    <label htmlFor="branchInput" className="mb-2 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Branch</label>
+                    <select
                       id="branchInput"
-                      type="text" 
-                      placeholder="e.g. B.Tech Computer Science"
-                      value={branch}
-                      onChange={(e) => setBranch(e.target.value)}
+                      value={branchId ?? ""}
+                      onChange={(e) => setBranchId(e.target.value ? Number(e.target.value) : null)}
                       className="motion-focus w-full rounded-xl border border-border bg-background p-3 text-sm text-foreground outline-none focus:border-primary focus:bg-surface"
-                    />
+                    >
+                      <option value="">Select Branch</option>
+                      {branches.map(b => <option key={b.id} value={b.id}>{b.code} — {b.name}</option>)}
+                    </select>
                   </div>
                   <div>
-                    <label className="mb-2 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Year</label>
-                    <select value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} className="motion-focus w-full rounded-xl border border-border bg-background p-3 text-sm text-foreground outline-none focus:border-primary">
+                    <label htmlFor="yearInput" className="mb-2 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Year</label>
+                    <select
+                      id="yearInput"
+                      value={year ?? ""}
+                      onChange={(e) => setYear(e.target.value ? Number(e.target.value) : null)}
+                      className="motion-focus w-full rounded-xl border border-border bg-background p-3 text-sm text-foreground outline-none focus:border-primary"
+                    >
                       <option value="">Select Year</option>
-                      <option value="1st year">1st year</option>
-                      <option value="2nd year">2nd year</option>
-                      <option value="3rd year">3rd year</option>
-                      <option value="4th year">4th year</option>
-                      <option value="5th year">5th year</option>
+                      {ACADEMIC_YEARS.map(y => <option key={y.value} value={y.value}>{y.label}</option>)}
                     </select>
                   </div>
                 </div>

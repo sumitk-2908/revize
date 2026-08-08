@@ -3,7 +3,7 @@ import { Metadata } from "next";
 import HomeClient from "./HomeClient";
 import { Suspense } from "react";
 import { HomeSkeleton } from "@/components/layout/SharedLayouts";
-import { getCachedSubjects, getCachedSubjectCounts } from "@/app/lib/api/cached-subjects";
+import { getCachedSubjects, getCachedSubjectCounts, getCachedBranches } from "@/app/lib/api/cached-subjects";
 
 export const metadata: Metadata = {
   title: {
@@ -32,7 +32,10 @@ export default async function Page() {
   // 2. Fetch item counts mapped to each subject
   const counts = await getCachedSubjectCounts();
 
-  // 3. Fetch stats and trending globally (cacheable)
+  // 3. Fetch the branch catalogue used by the branch/year filters
+  const branches = await getCachedBranches();
+
+  // 4. Fetch stats and trending globally (cacheable)
   const [{ count: modulesCount }, { data: analytics }, { data: recentDocs }] = await Promise.all([
     supabase.from("modules").select("*", { count: "exact", head: true }),
     supabase.from("document_analytics").select("view_count, download_count"),
@@ -55,11 +58,12 @@ export default async function Page() {
   return (
     <div className="animate-fade-up mx-auto w-full max-w-6xl">
       <Suspense fallback={<HomeSkeleton />}>
-        <HomeClient 
-          initialSubjects={subjects} 
-          counts={counts} 
-          globalStats={globalStats} 
-          trendingDocs={trendingDocs} 
+        <HomeClient
+          initialSubjects={subjects}
+          counts={counts}
+          branches={branches}
+          globalStats={globalStats}
+          trendingDocs={trendingDocs}
         />
       </Suspense>
     </div>

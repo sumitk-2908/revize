@@ -6,38 +6,41 @@ import { LandingHero } from "@/components/landing/LandingHero";
 import { TrendingCarousel } from "@/components/landing/TrendingCarousel";
 import SubjectGrid from "@/components/SubjectGrid";
 import { AnimatePresence, motion } from "framer-motion";
-import { Subject } from "@/app/lib/api/subjects";
+import { Subject, Branch } from "@/app/lib/api/subjects";
 
 interface HomeClientProps {
   initialSubjects: Subject[];
   counts: Record<string, number>;
+  branches: Branch[];
   globalStats: { subjects: number; modules: number; views: number; downloads: number };
   trendingDocs: any[];
 }
 
-export default function HomeClient({ initialSubjects, counts, globalStats, trendingDocs }: HomeClientProps) {
+export default function HomeClient({ initialSubjects, counts, branches, globalStats, trendingDocs }: HomeClientProps) {
   const [authStatus, setAuthStatus] = useState<"loading" | "authenticated" | "unauthenticated">("loading");
   const [firstName, setFirstName] = useState("");
   const [userFavs, setUserFavs] = useState<string[]>([]);
+  const [userBranchId, setUserBranchId] = useState<number | null>(null);
+  const [userYear, setUserYear] = useState<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session) {
         if (isMounted) setAuthStatus("unauthenticated");
         return;
       }
 
       if (isMounted) setAuthStatus("authenticated");
-      
+
       const { data: profile } = await supabase
         .from("profiles")
-        .select("favorite_subjects, full_name")
+        .select("favorite_subjects, full_name, branch_id, year_of_study")
         .eq("id", session.user.id)
         .single();
-      
+
       if (isMounted) {
         if (profile?.favorite_subjects) {
           setUserFavs(profile.favorite_subjects);
@@ -45,10 +48,12 @@ export default function HomeClient({ initialSubjects, counts, globalStats, trend
         if (profile?.full_name) {
           setFirstName(profile.full_name.split(" ")[0]);
         }
+        setUserBranchId(profile?.branch_id ?? null);
+        setUserYear(profile?.year_of_study ?? null);
       }
     };
     checkAuth();
-    
+
     return () => { isMounted = false; };
   }, []);
 
@@ -141,7 +146,13 @@ export default function HomeClient({ initialSubjects, counts, globalStats, trend
             <p className="text-muted">Explore our complete collection of academic materials by domain</p>
           </div>
         )}
-        <SubjectGrid subjects={sortedSubjects} subjectCounts={counts} />
+        <SubjectGrid
+          subjects={sortedSubjects}
+          subjectCounts={counts}
+          branches={branches}
+          defaultBranchId={userBranchId}
+          defaultYear={userYear}
+        />
       </motion.section>
     </>
   );

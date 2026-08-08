@@ -3,21 +3,23 @@
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X, Search } from "lucide-react";
-import { useSubjects } from "@/app/hooks/useSubjects";
+import { useSubjects, useBranches } from "@/app/hooks/useSubjects";
+import { ACADEMIC_YEARS, getYearLabel } from "@/app/lib/subject-config";
 import { useAuth } from "@/app/context/AuthContext";
 import { supabase } from "@/app/lib/api/core";
 
 export const OnboardingModal = () => {
   const { currentUserEmail, showOnboardingModal, setShowOnboardingModal, updateUserProfile } = useAuth();
   const { data: subjects = [] } = useSubjects();
+  const { data: branches = [] } = useBranches();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
-  const [branch, setBranch] = useState("");
-  const [academicYear, setAcademicYear] = useState("");
+  const [branchId, setBranchId] = useState<number | null>(null);
+  const [year, setYear] = useState<number | null>(null);
   const [favoriteSubjects, setFavoriteSubjects] = useState<string[]>([]);
   const [subjectQuery, setSubjectQuery] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  
+
   const handleSkip = () => {
     sessionStorage.setItem(`skipped_onboarding_${currentUserEmail}`, "true");
     setShowOnboardingModal(false);
@@ -29,7 +31,7 @@ export const OnboardingModal = () => {
       setErrorMsg("Display name is required.");
       return;
     }
-    if ((branch && !academicYear) || (!branch && academicYear)) {
+    if ((branchId && !year) || (!branchId && year)) {
       setErrorMsg("If you provide a branch, you must also provide your year, and vice versa.");
       return;
     }
@@ -38,20 +40,22 @@ export const OnboardingModal = () => {
     try {
       const { data: sess } = await supabase.auth.getSession();
       if (sess?.session?.user) {
+        const branchCode = branches.find(b => b.id === branchId)?.code || null;
+        const updates = {
+          full_name: name.trim(),
+          branch_id: branchId,
+          year_of_study: year,
+          // Legacy text columns kept in sync for the sidebar label and recommendations.
+          preferred_branch: branchCode,
+          academic_year: year ? getYearLabel(year) : null,
+          favorite_subjects: favoriteSubjects,
+        };
         const { error } = await supabase.from('profiles').upsert({
           id: sess.session.user.id,
-          full_name: name.trim(),
-          preferred_branch: branch || null,
-          academic_year: academicYear || null,
-          favorite_subjects: favoriteSubjects,
+          ...updates,
         });
         if (error) throw error;
-        updateUserProfile({ 
-          full_name: name.trim(), 
-          preferred_branch: branch || undefined, 
-          academic_year: academicYear || undefined, 
-          favorite_subjects: favoriteSubjects 
-        });
+        updateUserProfile(updates);
         setShowOnboardingModal(false);
       }
     } catch (err: any) {
@@ -84,21 +88,31 @@ export const OnboardingModal = () => {
             
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Branch</label>
-                <input type="text" value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="e.g. CSE" className="motion-focus h-11 w-full rounded-xl border border-border bg-background px-4 text-sm text-foreground outline-none focus:border-primary" />
+                <label htmlFor="onboarding-branch" className="mb-1 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Branch</label>
+                <select
+                  id="onboarding-branch"
+                  value={branchId ?? ""}
+                  onChange={(e) => setBranchId(e.target.value ? Number(e.target.value) : null)}
+                  className="motion-focus h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+                >
+                  <option value="">Select Branch</option>
+                  {branches.map(b => <option key={b.id} value={b.id}>{b.code} — {b.name}</option>)}
+                </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Year</label>
-                <select value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} className="motion-focus h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary">
+                <label htmlFor="onboarding-year" className="mb-1 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Year</label>
+                <select
+                  id="onboarding-year"
+                  value={year ?? ""}
+                  onChange={(e) => setYear(e.target.value ? Number(e.target.value) : null)}
+                  className="motion-focus h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+                >
                   <option value="">Select Year</option>
-                  <option value="1st year">1st year</option>
-                  <option value="2nd year">2nd year</option>
-                  <option value="3rd year">3rd year</option>
-                  <option value="4th year">4th year</option>
-                  <option value="5th year">5th year</option>
+                  {ACADEMIC_YEARS.map(y => <option key={y.value} value={y.value}>{y.label}</option>)}
                 </select>
               </div>
             </div>
+            <p className="-mt-2 text-xs text-muted">We use these to show the subjects for your branch and year first.</p>
 
             <div>
               <label className="mb-2 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Favorite Subjects (Max 5)</label>
