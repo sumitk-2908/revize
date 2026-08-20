@@ -151,7 +151,7 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
   return (
     <>
       {(!fullName || fullName === "Student") && (
-        <div className="animate-fade-in mb-4 flex flex-col items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:flex-row">
+        <div className="animate-fade-up mb-4 flex flex-col items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:flex-row">
           <p className="text-center text-sm font-semibold text-foreground sm:text-left">
             Complete your profile to unlock personalized recommendations and community recognition.
           </p>
@@ -264,7 +264,7 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
                 <div>
                   <label className="mb-2 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Favorite Subjects (Max 5)</label>
                   <div className="relative">
-                    <div className="motion-focus-within flex items-center gap-2 rounded-xl border border-border bg-background p-2 focus-within:border-primary focus-within:bg-surface">
+                    <div className="motion-focus flex items-center gap-2 rounded-xl border border-border bg-background p-2 focus-within:border-primary focus-within:bg-surface">
                       <Search size={16} className="ml-1 text-muted" />
                       <input 
                         type="text" 

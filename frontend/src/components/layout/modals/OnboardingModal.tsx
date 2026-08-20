@@ -117,7 +117,7 @@ export const OnboardingModal = () => {
             <div>
               <label className="mb-2 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Favorite Subjects (Max 5)</label>
               <div className="relative">
-                <div className="motion-focus-within flex items-center gap-2 rounded-xl border border-border bg-background p-2 focus-within:border-primary focus-within:bg-surface">
+                <div className="motion-focus flex items-center gap-2 rounded-xl border border-border bg-background p-2 focus-within:border-primary focus-within:bg-surface">
                   <Search size={16} className="ml-1 text-muted" />
                   <input 
                     type="text" 

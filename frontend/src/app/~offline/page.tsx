@@ -19,11 +19,11 @@ export default function OfflineFallbackPage() {
       </div>
 
       <h1 className="mb-1.5 text-4xl font-extrabold tracking-tight text-foreground">
-        You're Offline
+        You&rsquo;re Offline
       </h1>
 
       <p className="mb-8 max-w-md text-base text-muted">
-        It seems you've lost your internet connection. Don't worry, your cached portal and offline materials are still available.
+        It seems you&rsquo;ve lost your internet connection. Don&rsquo;t worry, your cached portal and offline materials are still available.
       </p>
 
       <div className="flex w-full max-w-md flex-col justify-center gap-4 sm:flex-row">

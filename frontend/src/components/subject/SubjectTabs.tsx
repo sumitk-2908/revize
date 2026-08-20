@@ -25,24 +25,31 @@ export default function SubjectTabs({
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchTabData = async () => {
-      if (activeTab === "dashboard") return;
+  // Non-module subjects have no module grid, so their dashboard lists every
+  // resource in the subject instead.
+  const showModuleGrid = activeTab === "dashboard" && !subjectDetails?.is_non_module;
 
+  useEffect(() => {
+    if (showModuleGrid) return;
+
+    let cancelled = false;
+    const fetchTabData = async () => {
       setLoading(true);
       const response = await searchDocuments({
         subject: subjectDetails.name,
-        category: activeTab,
+        category: activeTab === "dashboard" ? undefined : activeTab,
         sortBy: sortBy,
         limit: 50
       });
+      if (cancelled) return;
       setDocuments(response.data);
 
       setLoading(false);
     };
 
     fetchTabData();
-  }, [activeTab, sortBy, subjectDetails.name]);
+    return () => { cancelled = true; };
+  }, [activeTab, sortBy, subjectDetails.name, showModuleGrid]);
 
   return (
     <>
@@ -63,7 +70,7 @@ export default function SubjectTabs({
             </button>
           ))}
         </div>
-        {activeTab !== "dashboard" && (
+        {!showModuleGrid && (
           <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto pb-1 sm:pb-0">
             <label htmlFor="subject-sort" className="text-xs font-bold text-muted flex items-center gap-1.5">
               <ArrowDownUp size={14} /> Sort by
@@ -82,7 +89,7 @@ export default function SubjectTabs({
         )}
       </div>
 
-      {activeTab === "dashboard" && !subjectDetails?.is_non_module ? (
+      {showModuleGrid ? (
         <ErrorBoundary title="Course Modules could not load" message="The module grid hit an unexpected problem. Try refreshing.">
         <div className="space-y-4 pt-6">
           <h2 className="text-xs font-extrabold tracking-wider text-muted uppercase">
@@ -120,7 +127,7 @@ export default function SubjectTabs({
                       </div>
                     ) : (
                       <div className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-background/50 px-3 py-1 text-xs font-medium text-muted">
-                        <div className="size-1.5 rounded-full bg-muted-foreground/50" />
+                        <div className="size-1.5 rounded-full bg-muted/50" />
                         <span>No resources yet</span>
                       </div>
                     )}
@@ -131,8 +138,13 @@ export default function SubjectTabs({
           </div>
         </div>
         </ErrorBoundary>
-      ) : activeTab !== "dashboard" ? (
-        <div className="pt-6">
+      ) : (
+        <div className="space-y-4 pt-6">
+          {activeTab === "dashboard" && (
+            <h2 className="text-xs font-extrabold tracking-wider text-muted uppercase">
+              All Resources
+            </h2>
+          )}
           <ErrorBoundary
             title="Document grid could not load"
             message="The filtered resources hit an unexpected problem. Try again or switch tabs."
@@ -144,7 +156,7 @@ export default function SubjectTabs({
             />
           </ErrorBoundary>
         </div>
-      ) : null}
+      )}
     </>
   );
 }

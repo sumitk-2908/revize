@@ -35,13 +35,13 @@ export const useLogStudySessionMutation = () => {
 
       if (doc) {
         queryClient.setQueryData<any[]>(['studyHistory', 'recent', userId], (old) => {
-          let newHistory = (old || []).filter((d) => d.id !== documentId);
+          const newHistory = (old || []).filter((d) => d.id !== documentId);
           newHistory.unshift(doc);
           return newHistory.slice(0, 5);
         });
         
         queryClient.setQueryData<any[]>(['studyHistory', 'full', userId], (old) => {
-          let newHistory = (old || []).filter((d) => d.id !== documentId);
+          const newHistory = (old || []).filter((d) => d.id !== documentId);
           newHistory.unshift(doc);
           return newHistory;
         });

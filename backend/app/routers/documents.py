@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import asyncio
 import fitz
@@ -261,6 +262,46 @@ async def delete_document(
 # Search
 # ---------------------------------------------------------------------------
 
+def _prefix_tsquery(query: str) -> str:
+    """
+    Turn a raw user query into a `to_tsquery` expression with prefix matching,
+    e.g. "mcs syll" -> "mcs:* & syll:*".
+
+    Splitting on non-alphanumerics keeps the expression free of tsquery
+    operators, so a stray "(" or "," from the search box can never produce a
+    syntax error. Returns "" when nothing searchable is left.
+    """
+    terms = [term for term in re.split(r"[\W_]+", query, flags=re.UNICODE) if term]
+    return " & ".join(f"{term}:*" for term in terms)
+
+
+def _ilike_pattern(query: str) -> str:
+    """Build a PostgREST `ilike` pattern that matches `query` anywhere in a column."""
+    escaped = (
+        query.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+        .replace('"', '\\"')
+    )
+    return f"*{escaped}*"
+
+
+def _apply_text_filter(db_query, query: str):
+    """
+    Match the query against the `fts` column (title/subject/category, prefix
+    aware and word ranked) OR as a plain substring of the title/subject, so
+    mid-word searches like "xperim" -> "Software Experiments" still hit.
+    """
+    pattern = _ilike_pattern(query)
+    clauses = [f'title.ilike."{pattern}"', f'subject.ilike."{pattern}"']
+
+    tsquery = _prefix_tsquery(query)
+    if tsquery:
+        clauses.insert(0, f'fts.fts(english)."{tsquery}"')
+
+    return db_query.or_(",".join(clauses))
+
+
 @router.get("/search")
 @limiter.limit("30/minute")
 async def search_documents(
@@ -283,28 +324,23 @@ async def search_documents(
         "document_analytics(upvotes, view_count, download_count)"
     )
 
-    db_query = supabase.table("documents").select(selected_fields, count="exact").eq("status", "approved")
-
-    if query and query.strip():
-        db_query = db_query.textSearch("fts", query.strip(), config="english", type="websearch")
-
-    if category:
-        db_query = db_query.eq("category", category)
-    if subject:
-        db_query = db_query.eq("subject", subject)
-
-    # Supabase Python client sorting with foreign table
-    if sort_by in ["upvotes", "download_count"]:
-        # Fallback to local sorting if the python client rejects foreignTable natively
-        # We can fetch a bit more and sort in memory if needed, but for now we try native.
-        # Actually, let's just sort by created_at natively if it's a foreign table, 
-        # or rely on the frontend fetching and sorting if it fails.
-        # But we can try the postgrest syntax:
-        db_query = db_query.order(f"{sort_by}", foreign_table="document_analytics", desc=(sort_order == "desc"))
-    else:
-        db_query = db_query.order(sort_by, desc=(sort_order == "desc"))
-
     try:
+        db_query = supabase.table("documents").select(selected_fields, count="exact").eq("status", "approved")
+
+        if query and query.strip():
+            db_query = _apply_text_filter(db_query, query.strip())
+
+        if category:
+            db_query = db_query.eq("category", category)
+        if subject:
+            db_query = db_query.eq("subject", subject)
+
+        # Supabase Python client sorting with foreign table
+        if sort_by in ["upvotes", "download_count"]:
+            db_query = db_query.order(sort_by, foreign_table="document_analytics", desc=(sort_order == "desc"))
+        else:
+            db_query = db_query.order(sort_by, desc=(sort_order == "desc"))
+
         db_response = db_query.range(from_index, to_index).execute()
         count = db_response.count or 0
         return {

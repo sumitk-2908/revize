@@ -6,6 +6,7 @@ import { useSubjects, getIsNonModuleSubject } from "@/app/hooks/useSubjects";
 import { useUpload } from "@/app/context/UploadContext";
 import { useAuth } from "@/app/context/AuthContext";
 import UploadProgressBar from "@/components/ui/UploadProgressBar";
+import SubjectCombobox from "@/components/ui/SubjectCombobox";
 import { InlineSpinner } from "@/components/layout/SharedLayouts";
 
 export const UploadModal = () => {
@@ -31,8 +32,14 @@ export const UploadModal = () => {
         <form onSubmit={handleUpload} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Subject</label>
-              <select value={uploadSubject} onChange={(e) => setUploadSubject(e.target.value)} className="motion-focus h-11 w-full rounded-xl border border-border bg-background px-3 text-xs text-foreground outline-none">{subjects.map(sub => <option key={sub.name} value={sub.name}>{sub.name}</option>)}</select>
+              <label htmlFor="upload-subject" className="mb-1 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Subject</label>
+              <SubjectCombobox
+                id="upload-subject"
+                subjects={subjects}
+                value={uploadSubject}
+                onChange={setUploadSubject}
+                disabled={uploadState === "uploading" || uploadState === "processing"}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Module</label>

@@ -13,7 +13,7 @@ export default function NotFound() {
       </h1>
       
       <p className="mb-8 max-w-md text-lg text-muted">
-        We couldn't find the page you were looking for. It might have been removed, renamed, or didn't exist in the first place.
+        We couldn&rsquo;t find the page you were looking for. It might have been removed, renamed, or didn&rsquo;t exist in the first place.
       </p>
       
       <Link 

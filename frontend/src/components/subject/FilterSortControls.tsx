@@ -45,7 +45,7 @@ export default function FilterSortControls() {
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
         <Filter size={16} className="text-muted shrink-0 mr-1" />
         {CATEGORIES.map((category) => {
           const isActive = currentCategory === category.id;

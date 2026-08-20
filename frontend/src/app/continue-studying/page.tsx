@@ -68,8 +68,8 @@ function ContinueStudyingContent() {
       const safeHistory = Array.isArray(history) ? history : [];
       const historyIds = new Set(safeHistory.map((d: any) => d.id));
 
-      let userFavs: string[] = profile?.favorite_subjects || [];
-      let userBranch: string | null = profile?.preferred_branch || null;
+      const userFavs: string[] = profile?.favorite_subjects || [];
+      const userBranch: string | null = profile?.preferred_branch || null;
 
       let candidates: any[] = [];
 

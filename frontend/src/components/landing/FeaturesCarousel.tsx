@@ -150,7 +150,7 @@ export function FeaturesCarousel({ trendingDocs = [] }: { trendingDocs?: any[] }
         <div>
           <h4 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm mb-1">Help the Community</h4>
           <p className="text-xs text-zinc-500 px-2 leading-relaxed">
-            Can't find what you need? Request it from peers or upload your own to earn badges.
+            Can&rsquo;t find what you need? Request it from peers or upload your own to earn badges.
           </p>
         </div>
         <button className="px-4 py-1.5 bg-rose-500 text-white text-xs font-semibold rounded-full hover:bg-rose-600 transition-colors">

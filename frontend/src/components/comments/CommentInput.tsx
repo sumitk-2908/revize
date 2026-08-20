@@ -192,7 +192,7 @@ export const CommentInput = ({
           }`}>
             {charCount} / {MAX_CHARS}
           </span>
-          <span className="hidden sm:inline text-xs text-muted-light">
+          <span className="hidden sm:inline text-xs text-muted">
             (Supports bold, italic, lists, and inline code)
           </span>
         </div>

@@ -78,7 +78,7 @@ export default async function ContributorPage({
             <DocumentInteractiveGrid initialDocuments={docs} subjectSlug="" />
           ) : (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center text-muted">
-              <p>This contributor hasn't uploaded any public resources yet.</p>
+              <p>This contributor hasn&rsquo;t uploaded any public resources yet.</p>
             </div>
           )}
         </ErrorBoundary>

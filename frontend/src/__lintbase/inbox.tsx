@@ -4,46 +4,18 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/api/core";
 import { updateDocumentStatus, getFlaggedDocuments, dismissDocumentFlags, bulkUpdateDocumentStatus } from "@/app/lib/api/moderation";
 import { deleteDocument } from "@/app/lib/api/documents";
-import { Inbox, CheckCircle, Trash2, Eye, FileText, ArrowLeft, X, Flag, ShieldAlert, MessageSquareWarning, Upload, Search, Palette } from "lucide-react";
+import { getSubjects } from "@/app/lib/api/subjects";
+import { Inbox, CheckCircle, Trash2, Eye, FileText, ArrowLeft, X, Flag, ShieldAlert, MessageSquareWarning, Upload } from "lucide-react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { requestUploadPrompt } from "@/app/lib/student-prompts";
 import { DocumentGridSkeleton, InlineSpinner } from "@/components/layout/SharedLayouts";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
-import SubjectCardDesigner from "@/components/subject/SubjectCardDesigner";
 import { DocumentWithAnalytics, FlaggedDocument } from "@/app/lib/document-types";
 import { useNotifications } from "@/app/context/NotificationsContext";
 
-/** Per-tab hero styling. A lookup rather than nested ternaries, now that there are three tabs. */
-const TAB_HERO = {
-  pending: {
-    shell: 'border-warning/20 bg-warning/5',
-    chip: 'bg-warning',
-    text: 'text-warning',
-    icon: Inbox,
-    title: 'Admin Moderation Hub',
-    blurb: 'Audit crowdsourced assets before deployment.',
-  },
-  flagged: {
-    shell: 'border-destructive/20 bg-destructive/5',
-    chip: 'bg-destructive',
-    text: 'text-destructive',
-    icon: ShieldAlert,
-    title: 'Admin Moderation Hub',
-    blurb: 'Review community-flagged content for quality control.',
-  },
-  design: {
-    shell: 'border-primary/20 bg-primary/5',
-    chip: 'bg-primary',
-    text: 'text-primary',
-    icon: Palette,
-    title: 'Subject Card Design',
-    blurb: 'Design how each subject appears in the student subject grid.',
-  },
-} as const;
-
 function AdminInboxAuditingContent() {
-  const [activeTab, setActiveTab] = useState<'pending' | 'flagged' | 'design'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'flagged'>('pending');
   
   const [pendingDocs, setPendingDocs] = useState<DocumentWithAnalytics[]>([]);
   const [flaggedDocs, setFlaggedDocs] = useState<FlaggedDocument[]>([]);
@@ -52,9 +24,8 @@ function AdminInboxAuditingContent() {
   // F1 Pagination & Filtering
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  // What the admin is typing, and the debounced value the query actually runs on.
-  const [subjectQuery, setSubjectQuery] = useState("");
-  const [appliedSubjectQuery, setAppliedSubjectQuery] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState<string>("All");
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [pendingTotalCount, setPendingTotalCount] = useState(0);
 
   // F3 Bulk Actions
@@ -77,6 +48,12 @@ function AdminInboxAuditingContent() {
 
   const loadInbox = async () => {
     setLoading(true);
+    
+    // Fetch Subjects for Filter
+    if (subjects.length === 0) {
+      const subjData = await getSubjects();
+      setSubjects(subjData.map((s: any) => s.name));
+    }
 
     // Fetch Pending Approvals
     let query = supabase
@@ -85,10 +62,8 @@ function AdminInboxAuditingContent() {
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
-    if (appliedSubjectQuery) {
-      // Escape LIKE wildcards so a typed % or _ matches literally.
-      const escaped = appliedSubjectQuery.replace(/[%_\\]/g, (c) => `\\${c}`);
-      query = query.ilike('subject', `%${escaped}%`);
+    if (selectedSubject !== 'All') {
+      query = query.eq('subject', selectedSubject);
     }
 
     const pageSize = 20;
@@ -110,20 +85,9 @@ function AdminInboxAuditingContent() {
     setLoading(false);
   };
 
-  // Debounce typing so the inbox query runs on a settled search term, not per keystroke.
-  useEffect(() => {
-    const trimmed = subjectQuery.trim();
-    if (trimmed === appliedSubjectQuery) return;
-    const timer = setTimeout(() => {
-      setAppliedSubjectQuery(trimmed);
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [subjectQuery, appliedSubjectQuery]);
-
   useEffect(() => {
     loadInbox();
-  }, [page, appliedSubjectQuery]);
+  }, [page, selectedSubject]);
 
   useEffect(() => {
     const channel = supabase
@@ -242,9 +206,6 @@ function AdminInboxAuditingContent() {
     }
   };
 
-  const hero = TAB_HERO[activeTab];
-  const HeroIcon = hero.icon;
-
   return (
     <main className="animate-fade-up mx-auto w-full max-w-6xl space-y-6 pb-12">
       <div className="flex items-center justify-between">
@@ -261,14 +222,14 @@ function AdminInboxAuditingContent() {
         </div>
       </div>
 
-        <section className={`premium-transition flex items-center gap-4 rounded-3xl border p-6 ${hero.shell}`}>
-          <div className={`premium-transition flex size-12 shrink-0 items-center justify-center rounded-xl text-primary-foreground ${hero.chip}`}>
-            <HeroIcon size={24} />
+        <section className={`premium-transition flex items-center gap-4 rounded-3xl border p-6 ${activeTab === 'pending' ? 'border-warning/20 bg-warning/5' : 'border-destructive/20 bg-destructive/5'}`}>
+          <div className={`premium-transition flex size-12 shrink-0 items-center justify-center rounded-xl text-primary-foreground ${activeTab === 'pending' ? 'bg-warning' : 'bg-destructive'}`}>
+            {activeTab === 'pending' ? <Inbox size={24} /> : <ShieldAlert size={24} />}
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-foreground">{hero.title}</h1>
-            <p className={`mt-0.5 text-xs font-semibold tracking-wider ${hero.text}`}>
-              {hero.blurb}
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Admin Moderation Hub</h1>
+            <p className={`mt-0.5 text-xs font-semibold tracking-wider ${activeTab === 'pending' ? 'text-warning' : 'text-destructive'}`}>
+              {activeTab === 'pending' ? 'Audit crowdsourced assets before deployment.' : 'Review community-flagged content for quality control.'}
             </p>
           </div>
         </section>
@@ -282,49 +243,27 @@ function AdminInboxAuditingContent() {
             >
               Pending Audits ({activeTab === 'pending' ? pendingTotalCount : pendingDocs.length})
             </button>
-            <button
+            <button 
               onClick={() => setActiveTab('flagged')}
               className={`motion-hover motion-active flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${activeTab === 'flagged' ? 'bg-destructive text-destructive-foreground' : 'text-muted hover:bg-destructive/10 hover:text-destructive'}`}
             >
               <Flag size={16} /> Flagged Content ({flaggedDocs.length})
             </button>
-            <button
-              onClick={() => setActiveTab('design')}
-              className={`motion-hover motion-active flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${activeTab === 'design' ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-primary/10 hover:text-primary'}`}
-            >
-              <Palette size={16} /> Card Design
-            </button>
           </div>
           
           {activeTab === 'pending' && (
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-              <input
-                type="text"
-                inputMode="search"
-                aria-label="Search pending audits by subject"
-                placeholder="Search subjects..."
-                value={subjectQuery}
-                onChange={(e) => setSubjectQuery(e.target.value)}
-                className="w-full rounded-xl border border-border bg-surface py-2 pl-10 pr-10 text-sm font-semibold text-foreground outline-none transition-colors placeholder:font-medium placeholder:text-muted focus:border-primary"
-              />
-              {subjectQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSubjectQuery("")}
-                  aria-label="Clear subject search"
-                  className="motion-hover absolute inset-y-0 right-3 flex items-center text-muted hover:text-foreground"
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
+            <select
+              value={selectedSubject}
+              onChange={(e) => { setSelectedSubject(e.target.value); setPage(1); }}
+              className="rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground outline-none"
+            >
+              <option value="All">All Subjects</option>
+              {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
           )}
         </div>
 
-        {activeTab === 'design' ? (
-          <SubjectCardDesigner />
-        ) : loading ? (
+        {loading ? (
           <DocumentGridSkeleton count={6} />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -359,7 +298,7 @@ function AdminInboxAuditingContent() {
 
                     {doc.rejection_reason && (
                       <div className="rounded-lg border border-border bg-surface-hover p-2 text-xs text-muted italic">
-                        <strong>Prior Rejection Note:</strong> &ldquo;{doc.rejection_reason}&rdquo;
+                        <strong>Prior Rejection Note:</strong> "{doc.rejection_reason}"
                       </div>
                     )}
                   </div>

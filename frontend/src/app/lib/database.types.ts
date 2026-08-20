@@ -633,6 +633,12 @@ export type Database = {
       }
       subjects: {
         Row: {
+          card_badge: string | null
+          card_icon: string | null
+          card_layout: string | null
+          card_pattern: string | null
+          card_span: string | null
+          card_theme: string | null
           created_at: string | null
           id: number
           is_non_module: boolean | null
@@ -640,6 +646,12 @@ export type Database = {
           slug: string
         }
         Insert: {
+          card_badge?: string | null
+          card_icon?: string | null
+          card_layout?: string | null
+          card_pattern?: string | null
+          card_span?: string | null
+          card_theme?: string | null
           created_at?: string | null
           id?: number
           is_non_module?: boolean | null
@@ -647,6 +659,12 @@ export type Database = {
           slug: string
         }
         Update: {
+          card_badge?: string | null
+          card_icon?: string | null
+          card_layout?: string | null
+          card_pattern?: string | null
+          card_span?: string | null
+          card_theme?: string | null
           created_at?: string | null
           id?: number
           is_non_module?: boolean | null

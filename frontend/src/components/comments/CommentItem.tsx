@@ -46,7 +46,7 @@ const renderMarkdown = (text: string) => {
   const parseLineInline = (line: string, lineKey: string) => {
     // Basic tokenizer for **bold**, *italic*, `code`, and raw URLs
     // This is a naive regex-based replacer
-    let parsed = line
+    const parsed = line
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g, '<em>$1</em>')
       .replace(/`([^`]+)`/g, '<code class="bg-muted/20 px-1 py-0.5 rounded text-primary">$1</code>')
@@ -174,7 +174,7 @@ export const CommentItem = ({ comment, documentId, depth = 0, onRefresh, onReply
 
   return (
     <div className={`py-3 ${indentClass}`}>
-      <div className={`group relative rounded-xl border p-4 transition-colors ${comment.is_pinned ? 'border-primary/30 bg-primary/5' : 'border-border bg-surface hover:border-border-hover'}`}>
+      <div className={`group relative rounded-xl border p-4 transition-colors ${comment.is_pinned ? 'border-primary/30 bg-primary/5' : 'border-border bg-surface hover:border-primary/40'}`}>
         {comment.is_pinned && (
           <div className="absolute -top-2.5 right-4 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
             <Pin size={10} /> PINNED

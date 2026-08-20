@@ -11,6 +11,24 @@ export interface Subject {
   slug: string;
   is_non_module: boolean;
   subject_offerings: Offering[];
+  /** Grid-card appearance, designed per subject from the admin inbox.
+   *  All null on a subject nobody has designed — see app/lib/subject-design.ts. */
+  card_theme?: string | null;
+  card_icon?: string | null;
+  card_layout?: string | null;
+  card_pattern?: string | null;
+  card_badge?: string | null;
+  card_span?: string | null;
+}
+
+/** The card fields an admin can edit. `null` means "fall back to the derived default". */
+export interface SubjectCardDesign {
+  card_theme: string | null;
+  card_icon: string | null;
+  card_layout: string | null;
+  card_pattern: string | null;
+  card_badge: string | null;
+  card_span: string | null;
 }
 
 export interface Branch {
@@ -61,6 +79,25 @@ export const createSubject = async (subject: Omit<Subject, 'id' | 'subject_offer
 
 export const updateSubject = async (id: number, updates: Partial<Omit<Subject, 'subject_offerings'>>) => {
   const { data, error } = await supabase.from('subjects').update(updates).eq('id', id).select(SUBJECT_SELECT).single();
+  if (error) throw error;
+  return data as Subject;
+};
+
+/** Saves a subject's grid-card appearance. Pass null on a field to return it to the derived default. */
+export const updateSubjectDesign = async (id: number, design: SubjectCardDesign) => {
+  const { data, error } = await supabase
+    .from('subjects')
+    .update({
+      card_theme: design.card_theme,
+      card_icon: design.card_icon,
+      card_layout: design.card_layout,
+      card_pattern: design.card_pattern,
+      card_badge: design.card_badge?.trim() || null,
+      card_span: design.card_span,
+    })
+    .eq('id', id)
+    .select(SUBJECT_SELECT)
+    .single();
   if (error) throw error;
   return data as Subject;
 };

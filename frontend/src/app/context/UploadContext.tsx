@@ -66,6 +66,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (uploading) return;
+    if (!uploadSubject) {
+      showToast("Upload Error", "Please choose a subject.", "error");
+      return;
+    }
     if (!file) {
       showToast("Upload Error", "Please map a PDF resource!", "error");
       return;

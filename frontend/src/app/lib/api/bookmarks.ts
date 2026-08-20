@@ -32,7 +32,7 @@ export const getStudentBookmarks = async (userId?: string) => {
   
   try {
     const stored = localStorage.getItem("portal_bookmarks");
-    let parsed: StoredBookmark[] = stored ? JSON.parse(stored) : [];
+    const parsed: StoredBookmark[] = stored ? JSON.parse(stored) : [];
     
     // If successfully fetched from cloud, sync to local storage for offline use
     if (userId && !cloudError) {
