@@ -14,7 +14,15 @@ export const checkStorageLimit = async (): Promise<boolean> => {
   return true; // Fallback if API is unavailable
 };
 
-export const manageOfflinePdf = async (url: string, action: 'CACHE_PDF' | 'REMOVE_PDF'): Promise<boolean> => {
+/**
+ * Ask the service worker to add or drop a stored file in the offline cache.
+ *
+ * The `CACHE_PDF` / `REMOVE_PDF` message names are intentionally unchanged even
+ * though any supported file type can now be cached — they are the wire protocol
+ * shared with `worker/index.ts`, and renaming them would break for every user
+ * whose browser still has the previously installed service worker.
+ */
+export const manageOfflineFile = async (url: string, action: 'CACHE_PDF' | 'REMOVE_PDF'): Promise<boolean> => {
   if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
     console.warn("Service worker not active.");
     return false;
@@ -23,7 +31,7 @@ export const manageOfflinePdf = async (url: string, action: 'CACHE_PDF' | 'REMOV
   if (action === 'CACHE_PDF') {
     const hasSpace = await checkStorageLimit();
     if (!hasSpace) {
-      dispatchToast("Storage Full", "Device storage is almost full. Cannot save PDF for offline viewing.", "error");
+      dispatchToast("Storage Full", "Device storage is almost full. Cannot save this file for offline viewing.", "error");
       return false;
     }
   }

@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { 
+import {
   ArrowLeft, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
   Share2, Link as LinkIcon, Check, Maximize,
-  ThumbsUp, ThumbsDown, Flag, X 
+  ThumbsUp, ThumbsDown, Flag, X,
+  Download, File as FileIcon, FileText, FileSpreadsheet, Presentation
 } from "lucide-react";
 import { usePathname, useRouter } from 'next/navigation';
+import NextImage from "next/image";
 import { supabase } from "@/app/lib/api/core";
 import { trackDocumentStat, toggleUpvote, getUserUpvotes } from "@/app/lib/api/analytics";
-import { triggerStreakUpdate } from "@/app/lib/api/profile"; 
+import { triggerStreakUpdate } from "@/app/lib/api/profile";
 import { useLogStudySessionMutation } from "@/app/hooks/useStudyHistory";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -19,6 +21,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { InlineSpinner, SkeletonBlock } from "@/components/layout/SharedLayouts";
 import { dispatchToast as showToast } from "@/app/lib/toast";
+import { buildDownloadHref, getExtension, getFileKind, getFileLabel } from "@/app/lib/file-types";
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -26,15 +29,34 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url,
 ).toString();
 
+// Icon shown on the download-only card for file types with no in-app preview.
+const UNSUPPORTED_ICONS: Record<string, typeof FileIcon> = {
+  docx: FileText,
+  xlsx: FileSpreadsheet,
+  pptx: Presentation,
+};
+
 export default function PDFViewerClient({ documentMeta }: { documentMeta: any }) {
   const router = useRouter();
   const logStudySessionMutation = useLogStudySessionMutation();
+
+  // How this document renders is derived from the extension on its stored URL —
+  // there is no file-type column, so this also covers every pre-existing row.
+  const fileKind = getFileKind(documentMeta?.file_url);
+  const fileLabel = getFileLabel(documentMeta?.file_url);
+  const isPdf = fileKind === "pdf";
 
   const [numPages, setNumPages] = useState<number>(0);
   const [scale, setScale] = useState<number>(1.0);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
+  // Natural aspect ratio of an image document, measured once it loads, so the
+  // zoom box matches the image instead of guessing A4 like the PDF path does.
+  const [imageRatio, setImageRatio] = useState<number>(1 / 1.414);
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [textError, setTextError] = useState(false);
+
   const rowVirtualizer = useVirtualizer({
     count: numPages,
     getScrollElement: () => containerRef.current,
@@ -44,6 +66,10 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
 
   const virtualItems = rowVirtualizer.getVirtualItems();
   const currentPage = virtualItems.length > 0 ? virtualItems[0].index + 1 : 1;
+
+  // Zoom applies to the two rendered formats; text reflows and Office files
+  // have no preview at all.
+  const canZoom = isPdf || fileKind === "image";
   
   const [copied, setCopied] = useState(false);
   const hasTrackedView = useRef(false);
@@ -112,6 +138,28 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     return () => window.removeEventListener("resize", updateWidth);
   }, []);
 
+  // .txt / .md are fetched and shown as plain text. They are stored with a
+  // text/plain content type, so the contents are never interpreted as HTML.
+  useEffect(() => {
+    if (fileKind !== "text" || !documentMeta?.file_url) return;
+
+    let cancelled = false;
+    const loadText = async () => {
+      try {
+        const response = await fetch(documentMeta.file_url, { mode: "cors", credentials: "omit" });
+        if (!response.ok) throw new Error(`Storage returned ${response.status}`);
+        const body = await response.text();
+        if (!cancelled) setTextContent(body);
+      } catch (error) {
+        console.error("Failed to load text document:", error);
+        if (!cancelled) setTextError(true);
+      }
+    };
+    loadText();
+
+    return () => { cancelled = true; };
+  }, [fileKind, documentMeta?.file_url]);
+
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
   }
@@ -127,20 +175,20 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
       if (e.key === 'ArrowRight') {
-        changePage(1);
+        if (isPdf) changePage(1);
       } else if (e.key === 'ArrowLeft') {
-        changePage(-1);
+        if (isPdf) changePage(-1);
       } else if (e.key === '=' || e.key === '+') {
-        setScale(s => Math.min(s + 0.2, 2.5));
+        if (canZoom) setScale(s => Math.min(s + 0.2, 2.5));
       } else if (e.key === '-') {
-        setScale(s => Math.max(s - 0.2, 0.6));
+        if (canZoom) setScale(s => Math.max(s - 0.2, 0.6));
       } else if (e.key === 'Escape') {
         router.back();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentPage, numPages, router]);
+  }, [currentPage, numPages, router, isPdf, canZoom]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -155,17 +203,21 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   };
 
   const handleDownloadClick = async (e: React.MouseEvent) => {
-    e.preventDefault(); 
-    if (isDownloading.current) return; 
-    
+    e.preventDefault();
+    if (isDownloading.current) return;
+
+    // Read the href now: React nulls `currentTarget` once the handler returns,
+    // and everything below this line is async. Lets one handler serve both the
+    // "FullScreen" link (raw file) and the "Download" button (?download= href).
+    const targetUrl = (e.currentTarget as HTMLAnchorElement).href || documentMeta.file_url;
     isDownloading.current = true;
 
     try {
       await trackDocumentStat(documentMeta.id, 'download');
       const { data: sess } = await supabase.auth.getSession();
       if (sess?.session?.user?.id) {
-        logStudySessionMutation.mutate({ 
-          userId: sess.session.user.id, 
+        logStudySessionMutation.mutate({
+          userId: sess.session.user.id,
           documentId: documentMeta.id,
           doc: {
             ...documentMeta,
@@ -177,7 +229,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     } catch (error) {
       console.error("Tracking failed:", error);
     } finally {
-      window.open(documentMeta.file_url, '_blank');
+      window.open(targetUrl, '_blank');
       setTimeout(() => { isDownloading.current = false; }, 2000);
     }
   };
@@ -288,30 +340,39 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
           </DropdownMenu.Root>
 
           <a href={documentMeta.file_url} target="_blank" rel="noopener noreferrer" onClick={handleDownloadClick} className="motion-hover motion-active flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-primary hover:bg-primary/10 sm:px-3">
-             <span className="hidden sm:inline">FullScreen</span> <Maximize size={14} />
+             <span className="hidden sm:inline">{canZoom ? "FullScreen" : "Open"}</span> <Maximize size={14} />
           </a>
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center justify-between border-b border-border bg-surface px-4 py-2">
-        <div className="flex items-center gap-1">
-          <button aria-label="Zoom Out" onClick={() => setScale(s => Math.max(s - 0.2, 0.6))} className="motion-hover motion-active rounded-lg p-1.5 text-muted hover:bg-surface-hover"><ZoomOut size={18} aria-hidden="true" /></button>
-          <span className="w-10 text-center text-sm font-bold text-foreground tabular-nums" aria-hidden="true">{Math.round(scale * 100)}%</span>
-          <button aria-label="Zoom In" onClick={() => setScale(s => Math.min(s + 0.2, 2.5))} className="motion-hover motion-active rounded-lg p-1.5 text-muted hover:bg-surface-hover"><ZoomIn size={18} aria-hidden="true" /></button>
-        </div>
+      {canZoom && (
+        <div className="flex shrink-0 items-center justify-between border-b border-border bg-surface px-4 py-2">
+          <div className="flex items-center gap-1">
+            <button aria-label="Zoom Out" onClick={() => setScale(s => Math.max(s - 0.2, 0.6))} className="motion-hover motion-active rounded-lg p-1.5 text-muted hover:bg-surface-hover"><ZoomOut size={18} aria-hidden="true" /></button>
+            <span className="w-10 text-center text-sm font-bold text-foreground tabular-nums" aria-hidden="true">{Math.round(scale * 100)}%</span>
+            <button aria-label="Zoom In" onClick={() => setScale(s => Math.min(s + 0.2, 2.5))} className="motion-hover motion-active rounded-lg p-1.5 text-muted hover:bg-surface-hover"><ZoomIn size={18} aria-hidden="true" /></button>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <button aria-label="Previous Page" onClick={() => changePage(-1)} disabled={currentPage <= 1} className="motion-hover motion-active flex items-center justify-center rounded-lg bg-surface-hover p-1.5 text-foreground disabled:opacity-50"><ChevronLeft size={18} aria-hidden="true" /></button>
-          <span className="text-sm font-bold text-muted tabular-nums" aria-hidden="true">Page {currentPage} of {numPages || '--'}</span>
-          <button aria-label="Next Page" onClick={() => changePage(1)} disabled={currentPage >= numPages} className="motion-hover motion-active flex items-center justify-center rounded-lg bg-surface-hover p-1.5 text-foreground disabled:opacity-50"><ChevronRight size={18} aria-hidden="true" /></button>
+          {isPdf ? (
+            <>
+              <div className="flex items-center gap-2">
+                <button aria-label="Previous Page" onClick={() => changePage(-1)} disabled={currentPage <= 1} className="motion-hover motion-active flex items-center justify-center rounded-lg bg-surface-hover p-1.5 text-foreground disabled:opacity-50"><ChevronLeft size={18} aria-hidden="true" /></button>
+                <span className="text-sm font-bold text-muted tabular-nums" aria-hidden="true">Page {currentPage} of {numPages || '--'}</span>
+                <button aria-label="Next Page" onClick={() => changePage(1)} disabled={currentPage >= numPages} className="motion-hover motion-active flex items-center justify-center rounded-lg bg-surface-hover p-1.5 text-foreground disabled:opacity-50"><ChevronRight size={18} aria-hidden="true" /></button>
+              </div>
+              {/* ARIA Live region for screen readers to announce page changes */}
+              <div aria-live="polite" aria-atomic="true" className="sr-only">
+                {numPages > 0 ? `Page ${currentPage} of ${numPages}` : 'Loading PDF'}
+              </div>
+            </>
+          ) : (
+            <span className="text-sm font-bold tracking-wider text-muted uppercase">{fileLabel}</span>
+          )}
         </div>
-        {/* ARIA Live region for screen readers to announce page changes */}
-        <div aria-live="polite" aria-atomic="true" className="sr-only">
-          {numPages > 0 ? `Page ${currentPage} of ${numPages}` : 'Loading PDF'}
-        </div>
-      </div>
+      )}
 
       <div ref={containerRef} className="custom-scrollbar flex flex-1 justify-center overflow-auto bg-surface-hover p-4">
+        {isPdf && (
         <Document file={documentMeta.file_url} onLoadSuccess={onDocumentLoadSuccess} loading={<Loader2 className="mt-10 animate-spin text-primary" size={32} />} error={<p className="mt-10 text-xs text-destructive">Failed to load PDF. The file could not be fetched from storage.</p>}>
           {containerWidth > 0 && numPages > 0 && (
             <div
@@ -350,6 +411,83 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
             </div>
           )}
         </Document>
+        )}
+
+        {fileKind === "image" && containerWidth > 0 && (
+          <div
+            className="relative mb-4 bg-white shadow-lg ring-1 ring-foreground/5"
+            style={{
+              width: `${containerWidth * 0.95 * scale}px`,
+              height: `${(containerWidth * 0.95 * scale) / imageRatio}px`,
+            }}
+          >
+            {/* `fill` is the documented pattern for images of unknown dimensions;
+                `unoptimized` keeps the original bytes so zooming stays legible
+                and the server never re-encodes a scanned page on demand. */}
+            <NextImage
+              src={documentMeta.file_url}
+              alt={documentMeta.title || "Uploaded image"}
+              fill
+              unoptimized
+              sizes="95vw"
+              style={{ objectFit: "contain" }}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                  setImageRatio(img.naturalWidth / img.naturalHeight);
+                }
+              }}
+            />
+          </div>
+        )}
+
+        {fileKind === "text" && (
+          <div className="w-full max-w-3xl">
+            {textError ? (
+              <p className="mt-10 text-center text-xs text-destructive">
+                Failed to load this file. It could not be fetched from storage.
+              </p>
+            ) : textContent === null ? (
+              <div className="flex justify-center"><Loader2 className="mt-10 animate-spin text-primary" size={32} /></div>
+            ) : (
+              <pre className="custom-scrollbar overflow-x-auto rounded-2xl border border-border bg-surface p-5 font-mono text-sm leading-relaxed whitespace-pre-wrap text-foreground shadow-lg">
+                {textContent}
+              </pre>
+            )}
+          </div>
+        )}
+
+        {(fileKind === "office" || fileKind === "unknown") && (
+          <div className="flex w-full max-w-md flex-col items-center justify-center gap-4 self-center rounded-2xl border border-border bg-surface p-8 text-center shadow-lg">
+            {(() => {
+              const Icon = UNSUPPORTED_ICONS[getExtension(documentMeta.file_url)] ?? FileIcon;
+              return <Icon size={48} className="text-primary" aria-hidden="true" />;
+            })()}
+            <div>
+              <p className="text-base font-extrabold text-foreground">Preview isn&apos;t available for this file type</p>
+              <p className="mt-1 text-sm text-muted">
+                {fileLabel} files open in the app you use for them. Download a copy or open it in a new tab.
+              </p>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+              <a
+                href={buildDownloadHref(documentMeta.file_url, documentMeta.title)}
+                onClick={handleDownloadClick}
+                className="motion-hover motion-active flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:opacity-90"
+              >
+                <Download size={16} aria-hidden="true" /> Download
+              </a>
+              <a
+                href={documentMeta.file_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="motion-hover motion-active flex items-center gap-2 rounded-xl bg-surface-hover px-4 py-2.5 text-sm font-bold text-foreground"
+              >
+                <Maximize size={16} aria-hidden="true" /> Open in new tab
+              </a>
+            </div>
+          </div>
+        )}
       </div>
 
       <Dialog.Root open={isFlagModalOpen} onOpenChange={setIsFlagModalOpen}>

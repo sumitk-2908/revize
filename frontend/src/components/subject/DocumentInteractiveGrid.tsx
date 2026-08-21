@@ -6,7 +6,8 @@ import { Eye, FileQuestion, Upload } from "lucide-react";
 import { trackDocumentStat, toggleUpvote, getUserUpvotes } from "@/app/lib/api/analytics";
 import { deleteDocument, getPaginatedDocumentsByModule } from "@/app/lib/api/documents";
 import { supabase } from "@/app/lib/api/core";
-import { manageOfflinePdf } from "@/app/lib/offline-manager";
+import { manageOfflineFile } from "@/app/lib/offline-manager";
+import { buildDownloadFilename } from "@/app/lib/file-types";
 import { requestAuthPrompt } from "@/app/lib/auth-prompts";
 import { getUploadPromptCopy, recordStudentDownload, requestUploadPrompt, shouldShowContributionPrompt, dismissContributionPrompt } from "@/app/lib/student-prompts";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
@@ -130,9 +131,9 @@ export default function DocumentInteractiveGrid({
     const targetDoc = displayDocuments.find(d => d.id === id);
 
     if (isBookmarked) {
-      if (targetDoc?.file_url) manageOfflinePdf(targetDoc.file_url, 'REMOVE_PDF').catch(console.error);
+      if (targetDoc?.file_url) manageOfflineFile(targetDoc.file_url, 'REMOVE_PDF').catch(console.error);
     } else {
-      if (targetDoc?.file_url) manageOfflinePdf(targetDoc.file_url, 'CACHE_PDF').catch(console.error);
+      if (targetDoc?.file_url) manageOfflineFile(targetDoc.file_url, 'CACHE_PDF').catch(console.error);
     }
     
     toggleBookmarkMutation.mutate({ userId, documentId: id, isAdding: !isBookmarked, doc: targetDoc });
@@ -242,7 +243,7 @@ export default function DocumentInteractiveGrid({
       const localUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = localUrl;
-      link.download = `${doc.title}.pdf`;
+      link.download = buildDownloadFilename(doc.file_url, doc.title);
       document.body.appendChild(link);
       link.click();
       link.remove();

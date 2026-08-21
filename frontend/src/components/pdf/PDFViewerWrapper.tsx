@@ -23,7 +23,7 @@ export default function PDFViewerWrapper({ documentMeta }: { documentMeta: any }
   return (
     <ErrorBoundary
       title="Document viewer could not load"
-      message="The PDF viewer ran into a problem. Try refreshing, or open the document in a new tab."
+      message="The document viewer ran into a problem. Try refreshing, or open the file in a new tab."
     >
       <PDFViewerClient documentMeta={documentMeta} />
     </ErrorBoundary>

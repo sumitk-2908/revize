@@ -7,6 +7,24 @@ from app.main import app
 def test_client():
     return TestClient(app)
 
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    """Clear the in-memory rate-limit counters between tests.
+
+    Limits are keyed by client IP and TestClient always presents as the same
+    one, so counters accumulate across tests in a module. Without this, the
+    sixth request to a 5/minute endpoint gets a 429 instead of the status the
+    test is asserting — a failure that depends on test ordering.
+    """
+    from app.main import limiter as app_limiter
+    from app.routers.documents import limiter as documents_limiter
+
+    for limiter in (app_limiter, documents_limiter):
+        reset = getattr(limiter._storage, "reset", None)
+        if callable(reset):
+            reset()
+    yield
+
 @pytest.fixture
 async def async_client():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:

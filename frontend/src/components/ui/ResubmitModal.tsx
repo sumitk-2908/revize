@@ -1,5 +1,4 @@
 "use client";
-"use client";
 
 import { useState, useRef, useEffect } from "react";
 import { UploadCloud, XCircle, AlertCircle, FileText } from "lucide-react";
@@ -8,6 +7,7 @@ import { uploadWithProgress, UploadState } from "@/app/lib/api/documents";
 import UploadProgressBar from "./UploadProgressBar";
 import { InlineSpinner } from "@/components/layout/SharedLayouts";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import { UPLOAD_ACCEPT, validateUploadFile } from "@/app/lib/file-types";
 
 type DocumentData = {
   id: number;
@@ -63,6 +63,15 @@ export default function ResubmitModal({ document, isOpen, onClose, onSuccess }: 
     setUploadState("idle");
     setProgress(0);
     setError(null);
+
+    if (newFile) {
+      const fileError = validateUploadFile(newFile);
+      if (fileError) {
+        setUploadState("error");
+        setError(fileError);
+        return;
+      }
+    }
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -163,7 +172,7 @@ export default function ResubmitModal({ document, isOpen, onClose, onSuccess }: 
 
             {/* File Dropzone */}
             <div>
-              <label className="mb-1 block text-sm font-medium text-muted">Replace PDF (Optional)</label>
+              <label className="mb-1 block text-sm font-medium text-muted">Replace File (Optional)</label>
               <div 
                 onClick={() => { if(uploadState === "idle" || uploadState === "error") fileInputRef.current?.click() }}
                 className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-background p-6 transition-colors ${
@@ -181,10 +190,10 @@ export default function ResubmitModal({ document, isOpen, onClose, onSuccess }: 
                 ) : (
                   <div className="flex flex-col items-center text-muted">
                     <UploadCloud size={32} className="mb-2" />
-                    <span className="text-sm">Click to upload a new PDF</span>
+                    <span className="text-sm">Click to upload a new file</span>
                   </div>
                 )}
-                <input type="file" accept=".pdf" className="hidden" ref={fileInputRef} onChange={(e) => setNewFile(e.target.files?.[0] || null)} />
+                <input type="file" accept={UPLOAD_ACCEPT} className="hidden" ref={fileInputRef} onChange={(e) => setNewFile(e.target.files?.[0] || null)} />
               </div>
             </div>
 

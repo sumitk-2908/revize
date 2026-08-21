@@ -17,6 +17,7 @@ import UserDocumentCard from "./UserDocumentCard";
 import { recordStudentDownload, requestUploadPrompt, shouldShowContributionPrompt, dismissContributionPrompt } from "@/app/lib/student-prompts";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { DocumentWithAnalytics } from "@/app/lib/document-types";
+import { buildDownloadHref } from "@/app/lib/file-types";
 import { Tables } from "@/app/lib/database.types";
 import { User } from "@supabase/supabase-js";
 import { useLogStudySessionMutation } from "@/app/hooks/useStudyHistory";
@@ -106,7 +107,7 @@ export default function ProfileTabs({ user, history, bookmarks, uploads, achieve
       const downloadCount = recordStudentDownload();
       if (downloadCount >= 3) setShowContributionPrompt(shouldShowContributionPrompt(bookmarks.length));
       const link = document.createElement("a");
-      link.href = `${doc.file_url}?download=${encodeURIComponent(doc.title)}.pdf`;
+      link.href = buildDownloadHref(doc.file_url, doc.title);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

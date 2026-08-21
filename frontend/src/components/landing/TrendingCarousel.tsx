@@ -6,6 +6,7 @@ import { Flame, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useState, useRef } from "react";
 import { trackDocumentStat } from "@/app/lib/api/analytics";
+import { buildDownloadHref } from "@/app/lib/file-types";
 
 interface TrendingCarouselProps {
   documents: DocumentWithAnalytics[];
@@ -27,7 +28,7 @@ export function TrendingCarousel({ documents }: TrendingCarouselProps) {
     try {
       await trackDocumentStat(doc.id, "download");
       const link = document.createElement("a");
-      link.href = `${doc.file_url}?download=${encodeURIComponent(doc.title)}.pdf`;
+      link.href = buildDownloadHref(doc.file_url, doc.title);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

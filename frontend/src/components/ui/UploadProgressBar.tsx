@@ -57,7 +57,7 @@ export default function UploadProgressBar({
             <p className="line-clamp-1 text-xs text-muted">
               {state === "error"
                 ? errorMessage
-                : fileName || "Large PDFs may take a moment to process."}
+                : fileName || "Large files may take a moment to process."}
             </p>
           </div>
         </div>

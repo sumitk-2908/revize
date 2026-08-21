@@ -12,6 +12,7 @@ import { DocumentGridSkeleton } from "@/components/layout/SharedLayouts";
 import DocumentCard from "@/components/ui/DocumentCard";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { DocumentWithAnalytics } from "@/app/lib/document-types";
+import { buildDownloadHref } from "@/app/lib/file-types";
 import { useRecentStudyHistory } from "@/app/hooks/useStudyHistory";
 import { useProfilePreferences } from "@/app/hooks/useProfile";
 import { useQuery } from '@tanstack/react-query';
@@ -168,7 +169,7 @@ function ContinueStudyingContent() {
       const downloadCount = recordStudentDownload();
       if (downloadCount >= 3) setShowContributionPrompt(shouldShowContributionPrompt(0));
       const link = document.createElement("a");
-      link.href = `${doc.file_url}?download=${encodeURIComponent(doc.title)}.pdf`;
+      link.href = buildDownloadHref(doc.file_url, doc.title);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

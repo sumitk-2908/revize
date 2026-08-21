@@ -5,6 +5,7 @@ import { uploadDocument, UploadState } from "@/app/lib/api/documents";
 import { useSubjects, getIsNonModuleSubject } from "@/app/hooks/useSubjects";
 import { useAuth } from "@/app/context/AuthContext";
 import { dispatchToast as showToast } from "@/app/lib/toast";
+import { validateUploadFile } from "@/app/lib/file-types";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface UploadContextType {
@@ -71,11 +72,12 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (!file) {
-      showToast("Upload Error", "Please map a PDF resource!", "error");
+      showToast("Upload Error", "Please attach a file to upload!", "error");
       return;
     }
-    if (file.size > 52428800) {
-      showToast("Upload Blocked", "File size exceeds the 50MB limit.", "error");
+    const fileError = validateUploadFile(file);
+    if (fileError) {
+      showToast("Upload Blocked", fileError, "error");
       return;
     }
 

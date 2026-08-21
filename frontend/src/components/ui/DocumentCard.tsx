@@ -8,6 +8,7 @@ import { InlineSpinner } from "@/components/layout/SharedLayouts";
 import type { DocumentWithAnalytics } from "@/app/lib/document-types";
 import { subjectSlug as generateSlug } from "@/components/layout/utils";
 import { DiscoveryTooltip } from "@/components/ui/DiscoveryTooltip";
+import { getFileLabel } from "@/app/lib/file-types";
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = { 
   notes: NotebookPen, 
@@ -141,7 +142,7 @@ export default function DocumentCard({
         
         {/* Metadata */}
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm font-medium text-muted tabular-nums">
-          <span>{doc.page_count ? `${doc.page_count} pgs` : 'PDF'}</span>
+          <span>{doc.page_count ? `${doc.page_count} pgs` : getFileLabel(doc.file_url)}</span>
           <span>·</span>
           <span>{doc.file_size ? `${doc.file_size.toFixed(1)} MB` : 'N/A'}</span>
           <span>·</span>

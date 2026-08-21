@@ -8,7 +8,8 @@ import { Upload, Eye, Download, FileText, NotebookPen, FileQuestion, ListChecks,
 import Link from "next/link";
 import { getUploadPromptCopy, recordStudentDownload, requestUploadPrompt, shouldShowContributionPrompt, dismissContributionPrompt } from "../lib/student-prompts";
 import { requestAuthPrompt } from "../lib/auth-prompts";
-import { manageOfflinePdf } from "../lib/offline-manager";
+import { manageOfflineFile } from "../lib/offline-manager";
+import { buildDownloadHref } from "@/app/lib/file-types";
 import { DocumentGridSkeleton, InlineSpinner } from "@/components/layout/SharedLayouts";
 import DocumentCard from "@/components/ui/DocumentCard";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
@@ -57,9 +58,9 @@ function RecentUploadsContent() {
     const isBookmarked = bookmarks.includes(doc.id);
 
     if (isBookmarked) {
-      if (doc.file_url) manageOfflinePdf(doc.file_url, "REMOVE_PDF").catch(console.error);
+      if (doc.file_url) manageOfflineFile(doc.file_url, "REMOVE_PDF").catch(console.error);
     } else {
-      if (doc.file_url) manageOfflinePdf(doc.file_url, "CACHE_PDF").catch(console.error);
+      if (doc.file_url) manageOfflineFile(doc.file_url, "CACHE_PDF").catch(console.error);
     }
 
     toggleBookmarkMutation.mutate({ userId, documentId: doc.id, isAdding: !isBookmarked, doc });
@@ -77,7 +78,7 @@ function RecentUploadsContent() {
       const downloadCount = recordStudentDownload();
       if (downloadCount >= 3) setShowContributionPrompt(shouldShowContributionPrompt(0));
       const link = document.createElement("a");
-      link.href = `${doc.file_url}?download=${encodeURIComponent(doc.title)}.pdf`;
+      link.href = buildDownloadHref(doc.file_url, doc.title);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

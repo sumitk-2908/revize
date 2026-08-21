@@ -7,7 +7,8 @@ import { trackDocumentStat } from "../lib/api/analytics";
 import { dispatchToast } from "../lib/toast";
 import { Bookmark, Download, Eye, FileText, NotebookPen, FileQuestion, ListChecks, BookOpen, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { manageOfflinePdf } from "../lib/offline-manager";
+import { manageOfflineFile } from "../lib/offline-manager";
+import { buildDownloadHref } from "@/app/lib/file-types";
 import { requestAuthPrompt } from "../lib/auth-prompts";
 import { requestUploadPrompt, shouldShowContributionPrompt, dismissContributionPrompt } from "../lib/student-prompts";
 import { BookmarksSkeleton, InlineSpinner } from "@/components/layout/SharedLayouts";
@@ -63,7 +64,7 @@ function BookmarksContent() {
     if (!doc) return;
     
     if (doc.file_url) {
-      manageOfflinePdf(doc.file_url, 'REMOVE_PDF').catch(console.error);
+      manageOfflineFile(doc.file_url, 'REMOVE_PDF').catch(console.error);
     }
     
     toggleBookmarkMutation.mutate({ userId, documentId: id, isAdding: false, doc });
@@ -79,7 +80,7 @@ function BookmarksContent() {
     try {
       await trackDocumentStat(doc.id, 'download');
       const link = document.createElement("a");
-      link.href = `${doc.file_url}?download=${encodeURIComponent(doc.title)}.pdf`;
+      link.href = buildDownloadHref(doc.file_url, doc.title);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

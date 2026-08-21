@@ -8,6 +8,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import UploadProgressBar from "@/components/ui/UploadProgressBar";
 import SubjectCombobox from "@/components/ui/SubjectCombobox";
 import { InlineSpinner } from "@/components/layout/SharedLayouts";
+import { ALLOWED_TYPES_LABEL, UPLOAD_ACCEPT } from "@/app/lib/file-types";
 
 export const UploadModal = () => {
   const { 
@@ -28,7 +29,7 @@ export const UploadModal = () => {
           <Dialog.Title className="text-lg font-extrabold text-foreground">{isAdmin ? "Admin Database Upload" : "Student Contribution"}</Dialog.Title>
           <Dialog.Close asChild><button className="text-muted transition-opacity hover:opacity-80"><X size={20} /></button></Dialog.Close>
         </div>
-        <Dialog.Description className="sr-only">Upload a PDF document to the portal.</Dialog.Description>
+        <Dialog.Description className="sr-only">Upload a document to the portal.</Dialog.Description>
         <form onSubmit={handleUpload} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -55,10 +56,10 @@ export const UploadModal = () => {
             <div className="relative flex items-center justify-center rounded-xl border-2 border-dashed border-border bg-surface-hover p-6 transition-colors hover:border-primary/50 hover:bg-surface">
               <div className="text-center">
                 <Upload className="mx-auto mb-2 size-6 text-muted" />
-                <p className="text-sm font-semibold text-foreground">{file ? file.name : "Choose a PDF file or drag & drop it here"}</p>
-                <p className="mt-1 text-xs text-muted">PDFs only (Max 50MB)</p>
+                <p className="text-sm font-semibold text-foreground">{file ? file.name : "Choose a file or drag & drop it here"}</p>
+                <p className="mt-1 text-xs text-muted">{ALLOWED_TYPES_LABEL}</p>
               </div>
-              <input required type="file" accept="application/pdf, .pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed" disabled={uploadState === "uploading" || uploadState === "processing"} />
+              <input required type="file" accept={UPLOAD_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] || null)} className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed" disabled={uploadState === "uploading" || uploadState === "processing"} />
             </div>
           </div>
           <UploadProgressBar state={uploadState} progress={uploadProgress} fileName={file?.name} errorMessage={uploadErrorMsg} />

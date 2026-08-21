@@ -10,6 +10,15 @@ from fastapi import APIRouter, File, Form, UploadFile, HTTPException, Request, D
 from app.auth import verify_admin, verify_token, assert_aal2
 from app.storage import upload_to_r2, delete_from_r2, key_from_public_url
 from app.config import settings
+from app.file_types import (
+    FileSpec,
+    MAX_ANY_FILE_BYTES,
+    allowed_extensions_label,
+    spec_for_filename,
+    thumbnail_key_for,
+    verify_magic_bytes,
+    verify_payload,
+)
 from supabase import create_client, Client
 from slowapi import Limiter
 from pydantic import BaseModel
@@ -31,11 +40,16 @@ limiter = Limiter(key_func=get_real_ip)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# Hard limit on uploaded file size.  PyMuPDF will load the whole PDF into RAM
-# during thumbnail generation, so this also acts as a memory guard on the
-# (tiny) Render free-tier instance.
-MAX_FILE_SIZE_MB = 50
-MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+# Size caps are per-type and live in app.file_types.  They double as a memory
+# guard on the (tiny) Render free-tier instance, since the whole payload is
+# buffered before boto3 ships it — see `read_capped` below, which aborts an
+# oversized upload mid-stream rather than materializing all of it first.
+#
+# Longest edge, in pixels, of a generated thumbnail.
+THUMBNAIL_MAX_EDGE = 600
+
+# Chunk size for the capped streaming read.
+UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 from app.db import supabase
 
@@ -64,6 +78,138 @@ def extract_pdf_metadata(file_bytes: bytes):
     thumbnail_bytes = pix.tobytes("jpeg")
     return page_count, thumbnail_bytes
 
+
+def render_image_thumbnail(file_bytes: bytes, ext: str) -> bytes:
+    """
+    Downscales an uploaded image to a card-sized JPEG thumbnail.
+    Synchronous and CPU-bound, so callers run it via asyncio.to_thread.
+    """
+    image_doc = fitz.open(stream=file_bytes, filetype=ext)
+    page = image_doc.load_page(0)
+    longest_edge = max(page.rect.width, page.rect.height, 1)
+    scale = min(1.0, THUMBNAIL_MAX_EDGE / longest_edge)
+    pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale))
+    if pix.alpha:
+        # JPEG has no alpha channel; drop it or tobytes("jpeg") fails.
+        pix = fitz.Pixmap(pix, 0)
+    return pix.tobytes("jpeg")
+
+
+async def read_capped(file: UploadFile, max_bytes: int, limit_label: str) -> bytes:
+    """
+    Reads an UploadFile in chunks, aborting as soon as `max_bytes` is exceeded.
+
+    Starlette's UploadFile wraps a SpooledTemporaryFile, so reading in chunks
+    keeps peak memory bounded by the cap rather than by the payload — a 2GB
+    upload is rejected after the first chunk over the line instead of being
+    fully materialized and then thrown away.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(UPLOAD_CHUNK_BYTES)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum allowed size for {limit_label} is {max_bytes // (1024 * 1024)} MB.",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+async def build_preview(spec: FileSpec, file_bytes: bytes) -> tuple[Optional[int], Optional[bytes]]:
+    """
+    Returns (page_count, thumbnail_jpeg_bytes) for an already-validated payload.
+
+    Only PDFs yield a page count. PDFs and images yield a thumbnail; Office and
+    text files get none, and the UI falls back to a category icon.
+
+    A thumbnail failure is fatal for PDFs — a parse failure there means the file
+    is spoofed — but non-fatal for images. WebP in particular has no thumbnail:
+    MuPDF cannot decode it (measured against PyMuPDF 1.27), so a .webp upload
+    succeeds and simply shows the category icon on its card like any other
+    thumbnail-less row. Decoding it would mean adding Pillow as a dependency.
+    """
+    if spec.kind == "pdf":
+        try:
+            return await asyncio.to_thread(extract_pdf_metadata, file_bytes)
+        except Exception as e:
+            print(f"Security/Validation Error: Invalid PDF uploaded. {e}")
+            raise HTTPException(status_code=400, detail="Invalid, corrupted, or spoofed PDF file.")
+
+    if spec.kind == "image":
+        try:
+            return None, await asyncio.to_thread(render_image_thumbnail, file_bytes, spec.ext)
+        except Exception as e:
+            print(f"Warning: thumbnail generation failed for .{spec.ext}: {e}")
+            return None, None
+
+    return None, None
+
+
+class StoredUpload:
+    """Result of validating one uploaded file and pushing it to R2."""
+
+    def __init__(self, file_url, thumbnail_url, file_size_mb, page_count, r2_keys):
+        self.file_url = file_url
+        self.thumbnail_url = thumbnail_url
+        self.file_size_mb = file_size_mb
+        self.page_count = page_count
+        self.r2_keys = r2_keys
+
+
+async def validate_and_store_upload(file: UploadFile) -> StoredUpload:
+    """
+    The single upload code path, shared by POST /upload/ and POST /{id}/resubmit.
+
+    Validates in cheapest-first order — extension, then size (streaming), then
+    magic bytes, then a format-specific structural check — before spending any
+    CPU on thumbnails or any bandwidth on R2.
+    """
+    spec = spec_for_filename(file.filename)
+    if spec is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type. Allowed types: {allowed_extensions_label()}.",
+        )
+
+    file_bytes = await read_capped(file, min(spec.max_bytes, MAX_ANY_FILE_BYTES), f".{spec.ext} files")
+
+    if not verify_magic_bytes(spec, file_bytes[:16]):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file format. The contents don't match a .{spec.ext} file.",
+        )
+
+    try:
+        verify_payload(spec, file_bytes)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    file_size_mb = round(len(file_bytes) / (1024 * 1024), 2)
+    page_count, thumbnail_bytes = await build_preview(spec, file_bytes)
+
+    # Unique prefix prevents filename collisions in the bucket.
+    unique_prefix = uuid.uuid4().hex[:8]
+    safe_filename = f"{unique_prefix}_{file.filename.replace(' ', '_')}"
+    safe_thumb_key = thumbnail_key_for(safe_filename)
+
+    public_url = await upload_to_r2(safe_filename, file_bytes, spec.content_type)
+    r2_keys = [safe_filename]
+
+    thumbnail_url = None
+    if thumbnail_bytes:
+        try:
+            thumbnail_url = await upload_to_r2(safe_thumb_key, thumbnail_bytes, "image/jpeg")
+            r2_keys.append(safe_thumb_key)
+        except RuntimeError as e:
+            # Thumbnail failure is non-fatal — continue without it.
+            print(f"Warning: Thumbnail upload failed: {e}")
+
+    return StoredUpload(public_url, thumbnail_url, file_size_mb, page_count, r2_keys)
 
 
 def _r2_keys_for_doc(doc: dict) -> list[str]:
@@ -97,10 +243,14 @@ async def upload_document(
     file: UploadFile = File(...),
     user: dict = Depends(verify_token),
 ):
-    """Upload a PDF to R2 and insert the metadata row into Supabase."""
+    """Upload a document to R2 and insert the metadata row into Supabase."""
 
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
+    # Reject an unsupported type before doing any DB work or reading the body.
+    if spec_for_filename(file.filename) is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type. Allowed types: {allowed_extensions_label()}.",
+        )
 
     user_id = user.get("id")
 
@@ -125,45 +275,7 @@ async def upload_document(
     try:
         safe_module_id = None if module_id == "null" else int(module_id)
 
-        # Unique prefix prevents filename collisions in the bucket.
-        unique_prefix = uuid.uuid4().hex[:8]
-        safe_filename = f"{unique_prefix}_{file.filename.replace(' ', '_')}"
-        safe_thumb_key = f"thumb_{safe_filename.replace('.pdf', '.jpg')}"
-
-        file_bytes = await file.read()
-
-        # --- File size guard (catches oversized uploads before PyMuPDF touches them) ---
-        if len(file_bytes) > MAX_FILE_SIZE_BYTES:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File too large. Maximum allowed size is {MAX_FILE_SIZE_MB} MB.",
-            )
-
-        if not file_bytes.startswith(b"%PDF"):
-            raise HTTPException(status_code=400, detail="Invalid file format. Only PDF files are allowed.")
-
-        file_size_mb = round(len(file_bytes) / (1024 * 1024), 2)
-
-        # --- PDF validation + thumbnail (CPU-bound, offloaded to thread) ---
-        try:
-            page_count, thumbnail_bytes = await asyncio.to_thread(
-                extract_pdf_metadata, file_bytes
-            )
-        except Exception as e:
-            print(f"Security/Validation Error: Invalid PDF uploaded. {e}")
-            raise HTTPException(status_code=400, detail="Invalid, corrupted, or spoofed PDF file.")
-
-        # --- Upload PDF to R2 ---
-        public_url = await upload_to_r2(safe_filename, file_bytes, "application/pdf")
-
-        # --- Upload thumbnail to R2 ---
-        thumbnail_url = None
-        if thumbnail_bytes:
-            try:
-                thumbnail_url = await upload_to_r2(safe_thumb_key, thumbnail_bytes, "image/jpeg")
-            except RuntimeError as e:
-                # Thumbnail failure is non-fatal — continue without it.
-                print(f"Warning: Thumbnail upload failed: {e}")
+        stored = await validate_and_store_upload(file)
 
         # --- Insert metadata into Supabase DB ---
         category_val = category.value if hasattr(category, "value") else category
@@ -174,10 +286,10 @@ async def upload_document(
             "subject": subject,
             "uploaded_by": secure_uploaded_by,
             "uploader_name": uploader_name.strip() if uploader_name else "Anonymous",
-            "file_url": public_url,
-            "file_size": file_size_mb,
-            "page_count": page_count,
-            "thumbnail_url": thumbnail_url,
+            "file_url": stored.file_url,
+            "file_size": stored.file_size_mb,
+            "page_count": stored.page_count,
+            "thumbnail_url": stored.thumbnail_url,
             "status": secure_status,
         }
 
@@ -190,10 +302,7 @@ async def upload_document(
         except Exception as db_err:
             # ROLLBACK: remove the files we just uploaded so R2 doesn't accumulate orphans.
             print(f"DB insert failed — rolling back R2 uploads: {db_err}")
-            rollback_keys = [safe_filename]
-            if thumbnail_bytes:
-                rollback_keys.append(safe_thumb_key)
-            await delete_from_r2(rollback_keys)
+            await delete_from_r2(stored.r2_keys)
             raise HTTPException(status_code=500, detail="Database insert failed. Upload rolled back.")
 
     except HTTPException:
@@ -597,47 +706,14 @@ async def resubmit_document(
 
         # --- Handle optional file replacement ---
         if file and file.filename:
-            if not file.filename.endswith(".pdf"):
-                raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
+            stored = await validate_and_store_upload(file)
 
-            file_bytes = await file.read()
-
-            if len(file_bytes) > MAX_FILE_SIZE_BYTES:
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"File too large. Maximum allowed size is {MAX_FILE_SIZE_MB} MB.",
-                )
-
-            if not file_bytes.startswith(b"%PDF"):
-                raise HTTPException(status_code=400, detail="Invalid file format. Only PDF files are allowed.")
-
-            file_size_mb = round(len(file_bytes) / (1024 * 1024), 2)
-
-            try:
-                page_count, thumbnail_bytes = await asyncio.to_thread(
-                    extract_pdf_metadata, file_bytes
-                )
-            except Exception:
-                raise HTTPException(status_code=400, detail="Invalid, corrupted, or spoofed PDF file.")
-
-            unique_prefix = uuid.uuid4().hex[:8]
-            safe_filename = f"{unique_prefix}_{file.filename.replace(' ', '_')}"
-            safe_thumb_key = f"thumb_{safe_filename.replace('.pdf', '.jpg')}"
-
-            new_file_url = await upload_to_r2(safe_filename, file_bytes, "application/pdf")
-
-            new_thumb_url = None
-            if thumbnail_bytes:
-                try:
-                    new_thumb_url = await upload_to_r2(safe_thumb_key, thumbnail_bytes, "image/jpeg")
-                except RuntimeError as e:
-                    print(f"Warning: Thumbnail upload failed on resubmit: {e}")
-
-            update_payload["file_url"] = new_file_url
-            update_payload["file_size"] = file_size_mb
-            update_payload["page_count"] = page_count
-            if new_thumb_url:
-                update_payload["thumbnail_url"] = new_thumb_url
+            update_payload["file_url"] = stored.file_url
+            update_payload["file_size"] = stored.file_size_mb
+            update_payload["page_count"] = stored.page_count
+            # Always overwrite the thumbnail, including to None, so replacing a
+            # PDF with a .docx cannot leave a stale page-1 preview behind.
+            update_payload["thumbnail_url"] = stored.thumbnail_url
 
             # Queue the old R2 objects for deletion after the DB update succeeds.
             old_r2_keys = _r2_keys_for_doc(existing_doc)

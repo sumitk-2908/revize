@@ -127,7 +127,9 @@ export const uploadWithProgress = (
     xhr.open("POST", endpointUrl, true);
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     
-    xhr.timeout = 120000;
+    // Office files may be up to 75MB; 2 minutes was not enough headroom for a
+    // slow upstream link plus the server-side validation and R2 write.
+    xhr.timeout = 300000;
     xhr.ontimeout = () => {
       onStateChange("error");
       reject(new Error("Upload timed out. Please try again."));
