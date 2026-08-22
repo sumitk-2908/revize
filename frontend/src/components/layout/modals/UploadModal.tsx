@@ -1,7 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Upload } from "lucide-react";
+import { X, Upload, ClipboardList } from "lucide-react";
 import { documentHref } from "@/components/layout/utils";
 import { useSubjects, getIsNonModuleSubject } from "@/app/hooks/useSubjects";
 import { useUpload } from "@/app/context/UploadContext";
@@ -16,7 +16,8 @@ export const UploadModal = () => {
     showUploadForm, setShowUploadForm, uploadSubject, setUploadSubject,
     uploadModule, setUploadModule, uploadCategory, setUploadCategory,
     uploadTitle, setUploadTitle, file, setFile, uploadState,
-    uploadProgress, uploadErrorMsg, duplicateDocument, handleUpload
+    uploadProgress, uploadErrorMsg, duplicateDocument, handleUpload,
+    fulfilsRequestTitle
   } = useUpload();
   const { isAdmin } = useAuth();
   const { data: subjects = [] } = useSubjects();
@@ -31,6 +32,16 @@ export const UploadModal = () => {
             <Dialog.Close asChild><button className="text-muted transition-opacity hover:opacity-80"><X size={20} /></button></Dialog.Close>
           </div>
           <Dialog.Description className="sr-only">Upload a document to the portal.</Dialog.Description>
+          {fulfilsRequestTitle && (
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <ClipboardList size={16} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
+              <p className="text-xs leading-5 font-semibold text-foreground">
+                Answering the request
+                <span className="font-extrabold"> &ldquo;{fulfilsRequestTitle}&rdquo;</span>
+                <span className="block font-medium text-muted">It is marked fulfilled once this upload is approved.</span>
+              </p>
+            </div>
+          )}
           <form onSubmit={handleUpload} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>

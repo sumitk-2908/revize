@@ -284,6 +284,10 @@ export type Database = {
           file_url: string
           file_sha256: string | null
           fts: unknown
+          // Set when the upload was started from a resource request; the
+          // trigger in 20260822000600_resource_requests.sql fulfils that
+          // request once this document is approved.
+          fulfils_request_id: string | null
           id: number
           moderated_by: string | null
           module_id: number | null
@@ -310,6 +314,7 @@ export type Database = {
           file_url: string
           file_sha256?: string | null
           fts?: unknown
+          fulfils_request_id?: string | null
           id?: number
           moderated_by?: string | null
           module_id?: number | null
@@ -333,6 +338,7 @@ export type Database = {
           file_url?: string
           file_sha256?: string | null
           fts?: unknown
+          fulfils_request_id?: string | null
           id?: number
           moderated_by?: string | null
           module_id?: number | null
@@ -466,6 +472,82 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_requests: {
+        Row: {
+          category: string
+          created_at: string
+          details: string | null
+          fulfilled_at: string | null
+          fulfilled_by: string | null
+          fulfilled_document_id: number | null
+          id: string
+          module_id: number | null
+          requester_name: string | null
+          status: string
+          subject: string
+          title: string
+          updated_at: string
+          upvote_count: number
+          user_id: string
+        }
+        // Only the columns authenticated holds a column-level INSERT grant on —
+        // see 20260822000600_resource_requests.sql. Sending any other key is a
+        // "permission denied for column" error, not a silently ignored field.
+        Insert: {
+          category?: string
+          details?: string | null
+          module_id?: number | null
+          requester_name?: string | null
+          subject: string
+          title: string
+          user_id: string
+        }
+        // Likewise the column-level UPDATE grant: upvote_count and the
+        // fulfilment triple are written only by that migration's triggers.
+        Update: {
+          category?: string
+          details?: string | null
+          module_id?: number | null
+          status?: string
+          subject?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_requests_fulfilled_document_id_fkey"
+            columns: ["fulfilled_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_request_upvotes: {
+        Row: {
+          created_at: string
+          request_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          request_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          request_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_request_upvotes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "resource_requests"
             referencedColumns: ["id"]
           },
         ]

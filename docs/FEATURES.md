@@ -8,6 +8,7 @@
 - [x] Document upload (PDF, Office, images, text), processing, R2 storage, moderation, and resubmission
 - [x] Document viewing, bookmarks, study history, ratings, upvotes, and analytics
 - [x] Threaded comments, mentions, flags, pinning, and moderation
+- [x] Resource requests board with upvotes and upload-driven fulfilment
 - [x] Student profiles, contribution impact, streaks, and achievements
 - [x] Realtime notifications and achievement events
 - [x] TOTP MFA-protected administration, bulk review, audit logs, and analytics
@@ -49,6 +50,8 @@
 - Validate the filename extension, magic bytes, and per-type size cap, then run a type-specific structural check: PDFs are parsed for page count and a thumbnail, Office files are verified as OOXML containers with the expected internal parts and a bounded expansion ratio, images are rendered to a thumbnail, and text files must be NUL-free valid UTF-8.
 - Submit documents for review and resubmit rejected documents with optional file replacement.
 - Threaded comments with replies, edits, soft deletion, mentions, pinning, and flagging.
+- Request resources that are missing from the portal on a public "wanted" board: pick a subject, module, and category, and other students upvote what they also need. Requests are sorted by demand, filterable by subject and status, and capped at ten open per student.
+- Fulfil a request by uploading against it. The upload carries the request through moderation, and approving that document marks the request fulfilled, links it to the resource, and notifies the requester in realtime. Requesters can close or delete their own requests; administrators can delete any.
 - Public contributor profiles and contribution history.
 
 ## Moderation and administration

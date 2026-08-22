@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Home, User, Bookmark, Menu, X, Upload, FileText, Settings, LogOut, Plus, Inbox } from "lucide-react";
+import { Home, User, Bookmark, Menu, X, Upload, FileText, Settings, LogOut, Plus, Inbox, ClipboardList } from "lucide-react";
 import { useSidebar } from "@/app/context/SidebarContext";
 import { useAuth } from "@/app/context/AuthContext";
 import { requestUploadPrompt } from "@/app/lib/student-prompts";
@@ -67,6 +67,7 @@ export const MobileNav = () => {
                 )}
                 <Link href="/recent-uploads" onClick={() => setShowMobileMenu(false)} className="motion-hover motion-active flex items-center gap-3 rounded-xl bg-surface-hover p-4 text-sm font-bold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"><Upload size={20} /> Uploads</Link>
                 <Link href="/continue-studying" onClick={() => setShowMobileMenu(false)} className="motion-hover motion-active flex items-center gap-3 rounded-xl bg-surface-hover p-4 text-sm font-bold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"><FileText size={20} /> History</Link>
+                <Link href="/requests" onClick={() => setShowMobileMenu(false)} className="motion-hover motion-active flex items-center gap-3 rounded-xl bg-surface-hover p-4 text-sm font-bold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"><ClipboardList size={20} /> Requests</Link>
                 <button type="button" onClick={() => { setShowMobileMenu(false); requestUploadPrompt(); }} className="motion-hover motion-active flex items-center gap-3 rounded-xl bg-surface-hover p-4 text-sm font-bold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"><Plus size={20} /> Contribute</button>
                 <Link href="/profile" onClick={() => setShowMobileMenu(false)} className="motion-hover motion-active flex items-center gap-3 rounded-xl bg-surface-hover p-4 text-sm font-bold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"><Settings size={20} /> Settings</Link>
               </div>

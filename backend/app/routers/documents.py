@@ -5,6 +5,7 @@ import fitz
 import json
 import base64
 import hashlib
+import uuid
 from enum import Enum
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException, Request, Depends
 from app.auth import verify_admin, verify_token, assert_aal2
@@ -260,6 +261,44 @@ def _r2_keys_for_doc(doc: dict) -> list[str]:
     return keys
 
 
+def resolve_fulfilled_request(raw_request_id: Optional[str]) -> Optional[str]:
+    """
+    Validate the resource request an upload claims to answer.
+
+    Returns the id to store on the document, or None when the upload is not
+    answering a request. A malformed id is the client's bug and gets a 400, but a
+    request that has since been fulfilled or deleted only loses the link: the file
+    itself is fine, and failing the upload over a race would throw away a
+    perfectly good contribution.
+
+    The link takes effect on approval, not here -- see
+    fulfil_request_on_document_approval() in
+    supabase/migrations/20260822000600_resource_requests.sql.
+    """
+    if not raw_request_id or raw_request_id == "null":
+        return None
+
+    try:
+        uuid.UUID(raw_request_id)
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid resource request id.")
+
+    try:
+        open_request = (
+            supabase.table("resource_requests")
+            .select("id")
+            .eq("id", raw_request_id)
+            .eq("status", "open")
+            .limit(1)
+            .execute()
+        )
+    except Exception as e:
+        print(f"Warning: could not verify resource request {raw_request_id}: {e}")
+        return None
+
+    return raw_request_id if open_request.data else None
+
+
 # ---------------------------------------------------------------------------
 # Upload
 # ---------------------------------------------------------------------------
@@ -274,6 +313,7 @@ async def upload_document(
     subject: str = Form("General"),
     status: str = Form("pending"),
     uploader_name: str = Form(None),
+    fulfils_request_id: str = Form(None),
     file: UploadFile = File(...),
     user: dict = Depends(verify_token),
 ):
@@ -306,6 +346,10 @@ async def upload_document(
 
     secure_uploaded_by = user_id
 
+    # Rejected before any bytes are read: a bad id means a broken client, not a
+    # bad file.
+    secure_request_id = resolve_fulfilled_request(fulfils_request_id)
+
     try:
         safe_module_id = None if module_id == "null" else int(module_id)
 
@@ -327,6 +371,7 @@ async def upload_document(
             "status": secure_status,
             "content_text": stored.content_text,
             "file_sha256": stored.file_sha256,
+            "fulfils_request_id": secure_request_id,
         }
 
         try:
@@ -737,6 +782,9 @@ async def resubmit_document(
             "updated_at": "now()",
             "resubmission_count": existing_doc.get("resubmission_count", 0) + 1,
             # Intentionally keep rejection_reason so the admin sees the full history.
+            # fulfils_request_id is deliberately absent too: a document uploaded to
+            # answer a resource request keeps that link across a rejection, so the
+            # request is still fulfilled when the fixed version is approved.
         }
 
         old_r2_keys: list[str] = []

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Home, Inbox, Clock, Bookmark, Upload, TrendingUp } from "lucide-react";
+import { Home, Inbox, Clock, Bookmark, Upload, TrendingUp, ClipboardList } from "lucide-react";
 import { useSidebar } from "@/app/context/SidebarContext";
 import { useAuth } from "@/app/context/AuthContext";
 import ProfileSidebarCard from "@/components/profile/ProfileSidebarCard";
@@ -103,6 +103,19 @@ export const SidebarNavigation = () => {
           }`}
         >
           <Upload size={18} /> {!sidebarCollapsed && "Recent Uploads"}
+        </Link>
+        {/* Public board: signed-out students can read demand, so this is a plain
+            link rather than an auth-prompt button. */}
+        <Link
+          href="/requests"
+          title={sidebarCollapsed ? "Resource Requests" : undefined}
+          className={`motion-hover motion-active mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+            pathname === '/requests'
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted hover:bg-surface-hover hover:text-primary'
+          }`}
+        >
+          <ClipboardList size={18} /> {!sidebarCollapsed && "Requests"}
         </Link>
       </div>
 

@@ -292,6 +292,54 @@ async def test_resubmit_duplicate_lookup_excludes_current_document(monkeypatch):
     query.neq.assert_called_once_with("id", 17)
 
 
+# ---------------------------------------------------------------------------
+# Resource request linking (feature 9)
+# ---------------------------------------------------------------------------
+
+def test_resolve_fulfilled_request_ignores_absent_value():
+    """A plain upload, not started from the requests board."""
+    from app.routers.documents import resolve_fulfilled_request
+
+    assert resolve_fulfilled_request(None) is None
+    assert resolve_fulfilled_request("") is None
+    # UploadContext sends the string "null" for module_id, so guard the same form here.
+    assert resolve_fulfilled_request("null") is None
+
+
+def test_resolve_fulfilled_request_rejects_malformed_id():
+    """A non-uuid means a broken client, so it fails loudly rather than silently
+    dropping the link the contributor thinks they made."""
+    from app.routers.documents import resolve_fulfilled_request
+
+    with pytest.raises(HTTPException) as excinfo:
+        resolve_fulfilled_request("not-a-uuid")
+
+    assert excinfo.value.status_code == 400
+
+
+@patch("app.routers.documents.supabase")
+def test_resolve_fulfilled_request_accepts_open_request(mock_supabase):
+    from app.routers.documents import resolve_fulfilled_request
+
+    request_id = "b3f1c2d4-5e6a-4b7c-8d9e-0f1a2b3c4d5e"
+    query = mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value
+    query.limit.return_value.execute.return_value = MagicMock(data=[{"id": request_id}])
+
+    assert resolve_fulfilled_request(request_id) == request_id
+
+
+@patch("app.routers.documents.supabase")
+def test_resolve_fulfilled_request_drops_link_when_no_longer_open(mock_supabase):
+    """Somebody else's upload was approved while this one was in flight. The file
+    is still good, so only the link is dropped."""
+    from app.routers.documents import resolve_fulfilled_request
+
+    query = mock_supabase.table.return_value.select.return_value.eq.return_value.eq.return_value
+    query.limit.return_value.execute.return_value = MagicMock(data=[])
+
+    assert resolve_fulfilled_request("b3f1c2d4-5e6a-4b7c-8d9e-0f1a2b3c4d5e") is None
+
+
 @pytest.mark.asyncio
 @patch("app.routers.documents.supabase")
 @patch("app.routers.documents.upload_to_r2")

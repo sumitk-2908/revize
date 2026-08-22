@@ -32,9 +32,30 @@ export const getUploadPromptCopy = (documentCount: number, subjectName?: string)
   };
 };
 
+/** Fields the upload modal can be opened pre-filled with, e.g. from the resource
+ *  requests board. `fulfilsRequestId` is what links the finished upload back to
+ *  the request it answers. */
+export interface UploadPrefill {
+  subject?: string;
+  moduleId?: number | null;
+  category?: string;
+  title?: string;
+  fulfilsRequestId?: string;
+  /** Shown in the modal so the contributor can see what they are answering. */
+  requestTitle?: string;
+}
+
 export const requestUploadPrompt = () => {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event("portal_upload_prompt"));
+};
+
+/** `requestUploadPrompt` with the form pre-filled — used by the resource
+ *  requests board. Kept separate so the plain version stays usable directly as
+ *  an onClick handler, where the argument would otherwise be a MouseEvent. */
+export const requestUploadPromptFor = (prefill: UploadPrefill) => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<UploadPrefill>("portal_upload_prompt", { detail: prefill }));
 };
 
 export const recordStudentDownload = () => {

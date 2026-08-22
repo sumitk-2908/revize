@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Eye, Download, BookOpen, Clock, Sparkles, Upload, Settings, Trash2 } from "lucide-react";
+import { Eye, Download, BookOpen, Clock, Sparkles, Upload, Settings, Trash2, ClipboardList, Plus } from "lucide-react";
 import Link from "next/link";
 import { 
   trackDocumentStat, 
@@ -14,13 +14,22 @@ import ActivityHeatmap from "./ActivityHeatmap";
 import AchievementsList from "./AchievementsList";
 import ActivityTimeline from "./ActivityTimeline";
 import UserDocumentCard from "./UserDocumentCard";
-import { recordStudentDownload, requestUploadPrompt, shouldShowContributionPrompt, dismissContributionPrompt } from "@/app/lib/student-prompts";
+import RequestCard from "@/components/requests/RequestCard";
+import { recordStudentDownload, requestUploadPrompt, requestUploadPromptFor, shouldShowContributionPrompt, dismissContributionPrompt } from "@/app/lib/student-prompts";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { DocumentWithAnalytics } from "@/app/lib/document-types";
 import { buildDownloadHref } from "@/app/lib/file-types";
 import { Tables } from "@/app/lib/database.types";
 import { User } from "@supabase/supabase-js";
 import { useLogStudySessionMutation } from "@/app/hooks/useStudyHistory";
+import {
+  useDeleteResourceRequestMutation,
+  useMyRequestUpvotes,
+  useMyResourceRequests,
+  useResourceRequestStatusMutation,
+  useToggleRequestUpvoteMutation,
+} from "@/app/hooks/useResourceRequests";
+import type { ResourceRequest } from "@/app/lib/api/requests";
 import type { StudyActivityDay } from "@/app/lib/api/history";
 import { useQueryClient } from "@tanstack/react-query";
 import { documentHref } from "@/components/layout/utils";
@@ -47,10 +56,27 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
     { id: "overview", label: "Overview" },
     { id: "library", label: "My Library" },
     { id: "contributions", label: "Contributions" },
+    { id: "requests", label: "My Requests" },
     { id: "achievements", label: "Achievements" },
     { id: "activity", label: "Activity" },
     { id: "settings", label: "Settings" }
   ];
+
+  // Kept off the wire until the tab is opened, so /profile's existing load gate
+  // is unaffected.
+  const { data: myRequests = [], isLoading: loadingRequests } = useMyResourceRequests(
+    user?.id,
+    activeTab === "requests"
+  );
+  const { data: myRequestUpvotes = [] } = useMyRequestUpvotes(activeTab === "requests" ? user?.id : undefined);
+  const toggleRequestUpvote = useToggleRequestUpvoteMutation();
+  const setRequestStatus = useResourceRequestStatusMutation();
+  const deleteRequest = useDeleteResourceRequestMutation();
+
+  const handleDeleteRequest = (request: ResourceRequest) => {
+    if (!window.confirm(`Delete the request "${request.title}"? This cannot be undone.`)) return;
+    deleteRequest.mutate(request.id);
+  };
    
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -308,8 +334,70 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
         </div>
       )}
 
+      {activeTab === "requests" && (
+        <div className="animate-fade-up space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold tracking-[0.06em] text-muted uppercase">My Requests</h3>
+            <Link href="/requests" className="motion-hover text-sm font-bold text-primary hover:opacity-80">
+              Browse Board
+            </Link>
+          </div>
+
+          {loadingRequests ? (
+            <div className="rounded-2xl border border-dashed border-border bg-surface-hover/50 py-8 text-center text-sm font-bold text-muted">
+              Loading your requests...
+            </div>
+          ) : myRequests.length > 0 ? (
+            myRequests.map((request) => (
+              <RequestCard
+                key={request.id}
+                request={request}
+                isUpvoted={myRequestUpvotes.includes(request.id)}
+                isOwner
+                onToggleUpvote={(target) =>
+                  user?.id &&
+                  toggleRequestUpvote.mutate({
+                    requestId: target.id,
+                    userId: user.id,
+                    isAdding: !myRequestUpvotes.includes(target.id),
+                  })
+                }
+                onFulfil={(target) =>
+                  requestUploadPromptFor({
+                    subject: target.subject,
+                    moduleId: target.module_id,
+                    category: target.category,
+                    title: target.title,
+                    fulfilsRequestId: target.id,
+                    requestTitle: target.title,
+                  })
+                }
+                onSetStatus={(target, status) =>
+                  setRequestStatus.mutate({ requestId: target.id, status })
+                }
+                onDelete={handleDeleteRequest}
+              />
+            ))
+          ) : (
+            <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-8 text-center">
+              <h3 className="text-base font-extrabold tracking-tight text-foreground">Ask for what is missing</h3>
+              <p className="mx-auto mt-1 max-w-md text-sm leading-6 font-medium text-muted">
+                Post the notes, PYQs, or tutorials you cannot find. Other students upvote them, and contributors
+                use the board to decide what to upload next.
+              </p>
+              <Link
+                href="/requests"
+                className="motion-hover motion-active mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:opacity-90"
+              >
+                <Plus size={15} /> Request a Resource
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === "achievements" && (
-        <div className="animate-fade-up">
+         <div className="animate-fade-up">
            <ErrorBoundary title="Achievements could not load" message="The achievements list hit an unexpected problem.">
              <AchievementsList achievements={achievements} />
            </ErrorBoundary>

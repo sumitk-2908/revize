@@ -9,7 +9,8 @@ export type AuthPromptFeature =
   | "activityGraph"
   | "studyStreak"
   | "profile"
-  | "comment";
+  | "comment"
+  | "resourceRequest";
 
 export type AuthPromptCopy = {
   title: string;
@@ -52,6 +53,10 @@ export const AUTH_PROMPT_COPY: Record<AuthPromptFeature, AuthPromptCopy> = {
   comment: {
     title: "Join the discussion",
     description: "Sign in to ask questions, help others, and add your insights to these notes.",
+  },
+  resourceRequest: {
+    title: "Request a resource",
+    description: "Sign in to ask for the notes you need and upvote what other students are missing.",
   },
 };
 

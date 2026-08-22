@@ -11,6 +11,7 @@ import { useSubjects, getIsNonModuleSubject } from "@/app/hooks/useSubjects";
 import { useAuth } from "@/app/context/AuthContext";
 import { dispatchToast as showToast } from "@/app/lib/toast";
 import { validateUploadFile } from "@/app/lib/file-types";
+import type { UploadPrefill } from "@/app/lib/student-prompts";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface UploadContextType {
@@ -25,6 +26,10 @@ interface UploadContextType {
   uploadProgress: number;
   uploadErrorMsg: string;
   duplicateDocument: DuplicateDocument | null;
+  /** Set when the modal was opened from a resource request; carried to the API so
+   *  the approval trigger can fulfil that request. */
+  fulfilsRequestId: string | null;
+  fulfilsRequestTitle: string | null;
 
   setShowUploadForm: (v: boolean) => void;
   setFile: (v: File | null) => void;
@@ -52,6 +57,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadErrorMsg, setUploadErrorMsg] = useState("");
   const [duplicateDocument, setDuplicateDocument] = useState<DuplicateDocument | null>(null);
+  const [fulfilsRequestId, setFulfilsRequestId] = useState<string | null>(null);
+  const [fulfilsRequestTitle, setFulfilsRequestTitle] = useState<string | null>(null);
 
   const { data: subjects = [] } = useSubjects();
 
@@ -62,14 +69,43 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   }, [subjects, uploadSubject]);
 
   useEffect(() => {
-    const handleUploadPrompt = () => {
-      if (isAdmin || isStudent) setShowUploadForm(true);
-      else openAuthPrompt("upload");
+    const handleUploadPrompt = (event: Event) => {
+      if (!isAdmin && !isStudent) {
+        openAuthPrompt("upload");
+        return;
+      }
+
+      // Opened from the resource requests board: pre-fill what the request
+      // already tells us, and remember the request so the upload can link to it.
+      const prefill = (event as CustomEvent<UploadPrefill | undefined>).detail;
+      if (prefill) {
+        if (prefill.subject) setUploadSubject(prefill.subject);
+        if (prefill.category) setUploadCategory(prefill.category);
+        if (prefill.title) setUploadTitle(prefill.title);
+        // Module 1 is the modal's own default, so a module-less request leaves it alone.
+        if (prefill.moduleId) setUploadModule(prefill.moduleId);
+        setFulfilsRequestId(prefill.fulfilsRequestId ?? null);
+        setFulfilsRequestTitle(prefill.requestTitle ?? null);
+      }
+
+      setShowUploadForm(true);
     };
 
     window.addEventListener("portal_upload_prompt", handleUploadPrompt);
     return () => window.removeEventListener("portal_upload_prompt", handleUploadPrompt);
   }, [isAdmin, isStudent, openAuthPrompt]);
+
+  /** Closing the modal drops the request link, so the next plain upload cannot
+   *  accidentally inherit it. */
+  const handleShowUploadForm = (open: boolean) => {
+    setShowUploadForm(open);
+    if (!open) {
+      setFulfilsRequestId(null);
+      setFulfilsRequestTitle(null);
+      setUploadErrorMsg("");
+      setDuplicateDocument(null);
+    }
+  };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,16 +141,20 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     formData.append("uploaded_by", authorName);
     formData.append("subject", uploadSubject);
     formData.append("status", isAdmin ? "approved" : "pending");
+    if (fulfilsRequestId) formData.append("fulfils_request_id", fulfilsRequestId);
 
     try {
       await uploadDocument(formData, (percent) => setUploadProgress(percent), (state) => setUploadState(state));
       setTimeout(async () => {
         setFile(null);
         setUploadTitle("");
-        setShowUploadForm(false);
+        handleShowUploadForm(false);
         setUploadState("idle");
         setUploading(false);
         queryClient.invalidateQueries({ queryKey: ['documents'] });
+        // An admin upload lands as 'approved', so the approval trigger may have
+        // just fulfilled the request this file answers.
+        if (fulfilsRequestId) queryClient.invalidateQueries({ queryKey: ['resource-requests'] });
         if (!isAdmin) showToast("Success", "Notes submitted! Pending admin approval.", "success");
       }, 1500);
     } catch (err: unknown) {
@@ -130,8 +170,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <UploadContext.Provider value={{
-      showUploadForm, uploading, file, uploadTitle, uploadCategory, uploadSubject, uploadModule, uploadState, uploadProgress, uploadErrorMsg, duplicateDocument,
-      setShowUploadForm, setFile, setUploadTitle, setUploadCategory, setUploadSubject, setUploadModule, handleUpload
+      showUploadForm, uploading, file, uploadTitle, uploadCategory, uploadSubject, uploadModule, uploadState, uploadProgress, uploadErrorMsg, duplicateDocument, fulfilsRequestId, fulfilsRequestTitle,
+      setShowUploadForm: handleShowUploadForm, setFile, setUploadTitle, setUploadCategory, setUploadSubject, setUploadModule, handleUpload
     }}>
       {children}
     </UploadContext.Provider>
