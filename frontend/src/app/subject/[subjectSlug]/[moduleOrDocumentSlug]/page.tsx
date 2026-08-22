@@ -6,15 +6,37 @@ import FilterSortControls from "@/components/subject/FilterSortControls";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { getPaginatedDocumentsByModule } from "@/app/lib/api/documents";
 import { Metadata } from "next";
+import DocumentView, { documentMetadata } from "../document-view";
+
+/**
+ * Two kinds of URL land on this segment, because Next.js allows only one dynamic
+ * folder per level:
+ *
+ *   /subject/<subject>/module-3      → the module's document listing
+ *   /subject/<subject>/<title-slug>  → a document with no module (a `syllabus`
+ *                                      upload, or any document in a subject
+ *                                      flagged `is_non_module`)
+ *
+ * A `module-<n>` segment always wins, so a document actually titled "Module 3"
+ * is only reachable through its `/module-<n>/` URL.
+ */
+const MODULE_SEGMENT = /^module-\d+$/;
+
+type RouteParams = { subjectSlug: string; moduleOrDocumentSlug: string };
 
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ subjectSlug: string; moduleSlug: string }>;
+  params: Promise<RouteParams>;
 }): Promise<Metadata> {
-  const { subjectSlug, moduleSlug } = await params;
+  const { subjectSlug, moduleOrDocumentSlug } = await params;
+
+  if (!MODULE_SEGMENT.test(moduleOrDocumentSlug)) {
+    return documentMetadata(subjectSlug, null, moduleOrDocumentSlug);
+  }
+
   const subjectName = subjectSlug.replace(/-/g, " ").toUpperCase();
-  const moduleNumber = parseInt(moduleSlug.replace("module-", "")) || 1;
+  const moduleNumber = parseInt(moduleOrDocumentSlug.replace("module-", "")) || 1;
 
   return {
     title: `Module ${moduleNumber} - ${subjectName}`,
@@ -26,17 +48,28 @@ export default async function ModulePage({
   params,
   searchParams,
 }: {
-  params: Promise<{ subjectSlug: string; moduleSlug: string }>;
+  params: Promise<RouteParams>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { subjectSlug, moduleSlug } = await params;
+  const { subjectSlug, moduleOrDocumentSlug } = await params;
+
+  if (!MODULE_SEGMENT.test(moduleOrDocumentSlug)) {
+    return (
+      <DocumentView
+        subjectSegment={subjectSlug}
+        moduleSlug={null}
+        docSegment={moduleOrDocumentSlug}
+      />
+    );
+  }
+
   const { category, sort } = await searchParams;
-  
+
   const categoryStr = typeof category === "string" ? category : "all";
   const sortStr = typeof sort === "string" ? sort : "created_at";
 
   const subjectName = subjectSlug.replace(/-/g, " ").toUpperCase();
-  const moduleNumber = parseInt(moduleSlug.replace("module-", "")) || 1;
+  const moduleNumber = parseInt(moduleOrDocumentSlug.replace("module-", "")) || 1;
 
   const dbSubject = await getCachedSubjectBySlug(subjectSlug).catch(() => null);
 

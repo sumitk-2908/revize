@@ -1,6 +1,6 @@
 import { MetadataRoute } from 'next';
 import { createClient } from '@/utils/supabase/server';
-import { subjectSlug as generateFallbackSlug } from '@/components/layout/utils';
+import { subjectSlug as generateFallbackSlug, documentPath } from '@/components/layout/utils';
 import { getCachedSubjects } from '@/app/lib/api/cached-subjects';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -24,9 +24,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // Fetch approved documents to extract subjects, modules, and document IDs
+  // `category` is selected because it decides whether a document's URL carries
+  // a module segment (see documentPath).
   const { data: documents } = await supabase
     .from('documents')
-    .select('id, slug, subject, module_id, updated_at')
+    .select('id, slug, subject, module_id, category, updated_at')
     .eq('status', 'approved');
 
   if (documents && documents.length > 0) {
@@ -47,9 +49,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         
         const currentSlug = subjectSlugMap.get(doc.subject) || generateFallbackSlug(doc.subject);
 
-        // Add individual document route (title slug, id only as a fallback)
+        // Add individual document route (title slug, id only as a fallback).
+        // Module-less documents sit directly under the subject.
         routes.push({
-          url: `${baseUrl}/subject/${currentSlug}/module-${doc.module_id}/${doc.slug || doc.id}`,
+          url: `${baseUrl}${documentPath(currentSlug, doc)}`,
           lastModified: new Date(doc.updated_at || Date.now()),
           changeFrequency: 'weekly',
           priority: 0.6,

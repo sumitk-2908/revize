@@ -6,7 +6,7 @@ import { Download, Eye, Bookmark, Trash2, FileText, NotebookPen, FileQuestion, L
 import { SUBJECT_UI_MAP } from "@/app/lib/subject-config";
 import { InlineSpinner } from "@/components/layout/SharedLayouts";
 import type { DocumentWithAnalytics } from "@/app/lib/document-types";
-import { subjectSlug as generateSlug, documentSlug } from "@/components/layout/utils";
+import { subjectSlug as generateSlug, documentPath } from "@/components/layout/utils";
 import { DiscoveryTooltip } from "@/components/ui/DiscoveryTooltip";
 import { getFileLabel } from "@/app/lib/file-types";
 
@@ -65,9 +65,9 @@ export default function DocumentCard({
   
   const Icon = CATEGORY_ICONS[doc.category] || FileText;
   const targetSubjectSlug = subjectSlug || (doc.subject ? generateSlug(doc.subject) : "default");
-  // URL segment is the uploader's title; the numeric id only backs up titles
-  // that slugify to nothing at all.
-  const docSegment = doc.slug || documentSlug(doc.title) || String(doc.id);
+  // Module-less documents (syllabus, non-module subjects) sit directly under the
+  // subject; the rest keep their /module-<n>/ segment.
+  const docHref = documentPath(targetSubjectSlug, doc);
 
   const bookmarkButton = onToggleBookmark ? (
     <button
@@ -159,7 +159,7 @@ export default function DocumentCard({
           {isDownloading ? <InlineSpinner label="Downloading" size={13} /> : <Download size={13} />} DL
         </button>
         
-        <Link href={`/subject/${targetSubjectSlug}/module-${doc.module_id || 1}/${docSegment}`} className="motion-hover motion-active inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-transparent bg-primary py-2 text-sm font-bold text-primary-foreground hover:opacity-90">
+        <Link href={docHref} className="motion-hover motion-active inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-transparent bg-primary py-2 text-sm font-bold text-primary-foreground hover:opacity-90">
           <Eye size={13} /> View
         </Link>
         
