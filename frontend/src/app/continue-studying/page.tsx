@@ -94,7 +94,7 @@ function ContinueStudyingContent() {
             .eq('status', 'approved')
             .order('created_at', { ascending: false })
             .limit(10);
-            
+
           if (profileDocs) {
             candidates = [...candidates, ...profileDocs.map((d: any) => ({ ...d, recSource: 'profile' }))];
           }
@@ -111,7 +111,7 @@ function ContinueStudyingContent() {
         if (historyIds.has(doc.id)) return;
 
         let score = 0;
-        
+
         // Base weights by source
         if (doc.recSource === 'related') score += 10;
         if (doc.recSource === 'profile') score += 8;
@@ -119,22 +119,22 @@ function ContinueStudyingContent() {
 
         // Contextual Boosts
         if (userFavs.includes(doc.subject)) score += 5;
-        
+
         // Branch match boost
         if (userBranch && (
-          doc.subject?.toLowerCase().includes(userBranch.toLowerCase()) || 
+          doc.subject?.toLowerCase().includes(userBranch.toLowerCase()) ||
           doc.title?.toLowerCase().includes(userBranch.toLowerCase())
         )) {
-          score += 5; 
+          score += 5;
         }
-        
+
         // Popularity Tie-breaker
         const popularityBonus = doc.view_count ? Math.min(doc.view_count / 50, 3) : 0;
         score += popularityBonus;
 
         // Deduplication & Score Aggregation
         if (scoredDocs.has(doc.id)) {
-          scoredDocs.get(doc.id).score += (score * 0.5); 
+          scoredDocs.get(doc.id).score += (score * 0.5);
         } else {
           scoredDocs.set(doc.id, { ...doc, score });
         }
@@ -185,7 +185,7 @@ function ContinueStudyingContent() {
 
   return (
     <div className="animate-fade-up mx-auto max-w-6xl space-y-10">
-      
+
       {/* HISTORY SECTION */}
       <section className="space-y-6">
         <div className="flex items-center gap-4 rounded-3xl border border-indigo-500/20 bg-indigo-500/5 p-6 shadow-sm">
@@ -197,26 +197,27 @@ function ContinueStudyingContent() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {loading ? (
-          <div className="col-span-full"><DocumentGridSkeleton count={6} /></div>
-        ) : isSignedOut ? (
-          <div className="col-span-full rounded-2xl border border-dashed border-indigo-500/30 bg-indigo-500/5 p-8 text-center">
-            <p className="mx-auto max-w-md text-sm leading-6 font-medium text-muted">
-              Sign in to pick up where you left off and get study suggestions based on your recent materials.
-            </p>
-            <button onClick={() => requestAuthPrompt("continueStudying")} className="motion-hover motion-active mt-4 rounded-xl bg-indigo-500 px-4 py-2 text-sm font-bold text-white hover:opacity-90">
-              Continue Studying
-            </button>
-          </div>
-        ) : safeDocuments.map(doc => (
+          {loading ? (
+            <div className="col-span-full"><DocumentGridSkeleton count={6} /></div>
+          ) : isSignedOut ? (
+            <div className="col-span-full rounded-2xl border border-dashed border-indigo-500/30 bg-indigo-500/5 p-8 text-center">
+              <p className="mx-auto max-w-md text-sm leading-6 font-medium text-muted">
+                Sign in to pick up where you left off and get study suggestions based on your recent materials.
+              </p>
+              <button onClick={() => requestAuthPrompt("continueStudying")} className="motion-hover motion-active mt-4 rounded-xl bg-indigo-500 px-4 py-2 text-sm font-bold text-white hover:opacity-90">
+                Continue Studying
+              </button>
+            </div>
+          ) : safeDocuments.map(doc => (
             <DocumentCard
               key={`hist-${doc.id}`}
               doc={doc}
               onDownload={handleDownload}
               isDownloading={downloadingIds.includes(doc.id)}
+              showReadingProgress
             />
           ))}
-          
+
           {safeDocuments.length === 0 && !loading && !isSignedOut && (
             <div className="col-span-full rounded-2xl border border-dashed border-indigo-500/30 bg-indigo-500/5 p-8 text-center">
               <h2 className="text-lg font-extrabold tracking-tight text-foreground">Start your study trail</h2>
@@ -257,7 +258,7 @@ function ContinueStudyingContent() {
       {/* SUGGESTIONS SECTION */}
       {!loading && !suggestionsLoading && suggestions.length > 0 && (
         <section className="space-y-6 border-t border-gray-100 pt-4 dark:border-gray-800">
-           <div className="flex items-center gap-3 px-2">
+          <div className="flex items-center gap-3 px-2">
             <div className="flex size-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
               <Sparkles size={18} />
             </div>

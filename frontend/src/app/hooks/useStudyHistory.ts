@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getRecentStudyActivity, getFullStudyHistory, getStudyActivityCalendar, logStudySession } from '@/app/lib/api/history';
+import { getRecentStudyActivity, getFullStudyHistory, getStudyActivityCalendar, logStudySession, updateReadingProgress } from '@/app/lib/api/history';
 import { dispatchToast } from '@/app/lib/toast';
 
 export const useRecentStudyHistory = (userId?: string) => {
@@ -48,7 +48,7 @@ export const useLogStudySessionMutation = () => {
           newHistory.unshift(doc);
           return newHistory.slice(0, 5);
         });
-        
+
         queryClient.setQueryData<any[]>(['studyHistory', 'full', userId], (old) => {
           const newHistory = (old || []).filter((d) => d.id !== documentId);
           newHistory.unshift(doc);
@@ -76,12 +76,12 @@ export const useLogStudySessionMutation = () => {
       if (context?.previousFull) {
         queryClient.setQueryData(['studyHistory', 'full', variables.userId], context.previousFull);
       }
-      
+
       try {
         if (context?.previousRecent) {
           localStorage.setItem("portal_study_history", JSON.stringify(context.previousRecent.slice(0, 5)));
         }
-      } catch (e) {}
+      } catch (e) { }
 
       dispatchToast("Error", "Failed to log study session.", "error");
     },
@@ -95,3 +95,8 @@ export const useLogStudySessionMutation = () => {
     },
   });
 };
+
+export const useUpdateReadingProgressMutation = () => useMutation({
+  mutationFn: ({ userId, documentId, lastPage }: { userId: string; documentId: number; lastPage: number }) =>
+    updateReadingProgress(userId, documentId, lastPage),
+});

@@ -12,7 +12,7 @@ import NextImage from "next/image";
 import { supabase } from "@/app/lib/api/core";
 import { trackDocumentStat, toggleUpvote, getUserUpvotes } from "@/app/lib/api/analytics";
 import { triggerStreakUpdate } from "@/app/lib/api/profile";
-import { useLogStudySessionMutation } from "@/app/hooks/useStudyHistory";
+import { useLogStudySessionMutation, useUpdateReadingProgressMutation } from "@/app/hooks/useStudyHistory";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -40,6 +40,7 @@ const UNSUPPORTED_ICONS: Record<string, typeof FileIcon> = {
 export default function PDFViewerClient({ documentMeta }: { documentMeta: any }) {
   const router = useRouter();
   const logStudySessionMutation = useLogStudySessionMutation();
+  const updateReadingProgressMutation = useUpdateReadingProgressMutation();
 
   // How this document renders is derived from the extension on its stored URL —
   // there is no file-type column, so this also covers every pre-existing row.
@@ -48,6 +49,9 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   const isPdf = fileKind === "pdf";
 
   const [numPages, setNumPages] = useState<number>(0);
+  const [resumePage, setResumePage] = useState<number | null>(null);
+  const [progressReady, setProgressReady] = useState(false);
+  const progressSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pdfDocument, setPdfDocument] = useState<Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]> | null>(null);
   const [scale, setScale] = useState<number>(1.0);
   const [containerWidth, setContainerWidth] = useState<number>(0);
@@ -183,7 +187,73 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     setNumPages(document.numPages);
   }
 
-  // Page heights are cached per index once measured. Zooming or resizing changes
+  // Fetch the saved position after auth is available. Keep a local mirror so a
+  // position saved during a transient network failure is still useful locally.
+  useEffect(() => {
+    if (!isPdf || !documentMeta?.id) return;
+
+    let cancelled = false;
+    const loadReadingProgress = async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const userId = sess?.session?.user?.id;
+      if (!userId) {
+        if (!cancelled) setProgressReady(true);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('study_history')
+        .select('last_page')
+        .eq('user_id', userId)
+        .eq('document_id', documentMeta.id)
+        .maybeSingle();
+
+      let savedPage = data?.last_page ?? null;
+      if (!savedPage) {
+        try {
+          const stored = JSON.parse(localStorage.getItem('portal_study_history') || '[]');
+          savedPage = stored.find((item: { id: number }) => item.id === documentMeta.id)?.last_page ?? null;
+        } catch {
+          savedPage = null;
+        }
+      }
+
+      if (!cancelled) {
+        setResumePage(savedPage);
+        setProgressReady(true);
+      }
+    };
+
+    loadReadingProgress();
+    return () => { cancelled = true; };
+  }, [documentMeta?.id, isPdf]);
+
+  useEffect(() => {
+    if (!isPdf || !progressReady || numPages < 1 || currentPage < 1) return;
+    if (progressSaveTimer.current) clearTimeout(progressSaveTimer.current);
+
+    progressSaveTimer.current = setTimeout(async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const userId = sess?.session?.user?.id;
+      if (!userId) return;
+      try {
+        await updateReadingProgressMutation.mutateAsync({ userId, documentId: documentMeta.id, lastPage: currentPage });
+        try {
+          const stored = JSON.parse(localStorage.getItem('portal_study_history') || '[]');
+          const next = Array.isArray(stored) ? stored.map((item: { id: number }) => item.id === documentMeta.id ? { ...item, last_page: currentPage } : item) : [];
+          localStorage.setItem('portal_study_history', JSON.stringify(next));
+        } catch { /* localStorage is best effort */ }
+      } catch (error) {
+        console.warn('Failed to save reading progress:', error);
+      }
+    }, 800);
+
+    return () => {
+      if (progressSaveTimer.current) clearTimeout(progressSaveTimer.current);
+    };
+  }, [currentPage, documentMeta?.id, isPdf, numPages, progressReady, updateReadingProgressMutation]);
+
+  // Page heights are cached per index. Zooming or resizing changes every page's
   // every one of them, so the cache has to be dropped or scrollToIndex keeps
   // aiming at stale offsets and lands on the wrong page.
   useEffect(() => {

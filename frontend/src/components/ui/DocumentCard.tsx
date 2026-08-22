@@ -10,11 +10,11 @@ import { subjectSlug as generateSlug, documentPath } from "@/components/layout/u
 import { DiscoveryTooltip } from "@/components/ui/DiscoveryTooltip";
 import { getFileLabel } from "@/app/lib/file-types";
 
-const CATEGORY_ICONS: Record<string, LucideIcon> = { 
-  notes: NotebookPen, 
-  pyq: FileQuestion, 
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  notes: NotebookPen,
+  pyq: FileQuestion,
   tutorial_sheet: BookOpen,
-  syllabus: ListChecks 
+  syllabus: ListChecks
 };
 
 const getTimeAgo = (dateStr: string | null) => {
@@ -40,29 +40,31 @@ export interface DocumentCardProps {
   onDelete?: (id: number) => void;
   isDownloading?: boolean;
   showBookmarkTooltip?: boolean;
+  showReadingProgress?: boolean;
 }
 
-export default function DocumentCard({ 
-  doc, 
-  subjectSlug, 
-  isBookmarked = false, 
+export default function DocumentCard({
+  doc,
+  subjectSlug,
+  isBookmarked = false,
   isUpvoted = false,
   currentUpvoteCount,
   isAdmin = false,
   isSuggestion = false,
   badgeText,
-  onDownload, 
-  onToggleBookmark, 
+  onDownload,
+  onToggleBookmark,
   onToggleUpvote,
   onDelete,
   isDownloading = false,
-  showBookmarkTooltip = false
+  showBookmarkTooltip = false,
+  showReadingProgress = false
 }: DocumentCardProps) {
-  
+
   const slug = subjectSlug || (doc.subject ? generateSlug(doc.subject) : "default");
   const ui = SUBJECT_UI_MAP[slug] || SUBJECT_UI_MAP["default"];
   const accentBorderColor = ui.border ? ui.border.replace('border-', 'border-l-') : 'border-l-muted';
-  
+
   const Icon = CATEGORY_ICONS[doc.category] || FileText;
   const targetSubjectSlug = subjectSlug || (doc.subject ? generateSlug(doc.subject) : "default");
   // Module-less documents (syllabus, non-module subjects) sit directly under the
@@ -72,11 +74,10 @@ export default function DocumentCard({
   const bookmarkButton = onToggleBookmark ? (
     <button
       onClick={(e) => { e.preventDefault(); onToggleBookmark(doc.id); }}
-      className={`motion-hover motion-active absolute top-2 right-2 rounded-lg border p-1.5 shadow-sm backdrop-blur-md ${
-        isBookmarked
+      className={`motion-hover motion-active absolute top-2 right-2 rounded-lg border p-1.5 shadow-sm backdrop-blur-md ${isBookmarked
           ? "border-warning bg-warning text-white"
           : "border-border/60 bg-background/70 text-warning hover:bg-warning/10"
-      }`}
+        }`}
       aria-label={isBookmarked ? "Remove bookmark" : "Bookmark resource"}
     >
       <Bookmark size={13} className={isBookmarked ? "fill-white text-white" : "text-warning"} />
@@ -84,14 +85,13 @@ export default function DocumentCard({
   ) : null;
 
   return (
-    <article className={`group flex flex-col rounded-2xl border border-l-[3px] ${accentBorderColor} motion-hover p-5 shadow-sm hover:-translate-y-1 hover:shadow-md ${
-      isSuggestion
+    <article className={`group flex flex-col rounded-2xl border border-l-[3px] ${accentBorderColor} motion-hover p-5 shadow-sm hover:-translate-y-1 hover:shadow-md ${isSuggestion
         ? "border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40 hover:border-y-amber-500/40 dark:hover:border-indigo-500"
-        : isBookmarked 
-        ? "border-warning/20 bg-warning/5 hover:border-warning/40 hover:border-y-warning/40" 
-        : "border-border bg-surface hover:border-y-border hover:border-r-border"
-    }`}>
-      
+        : isBookmarked
+          ? "border-warning/20 bg-warning/5 hover:border-warning/40 hover:border-y-warning/40"
+          : "border-border bg-surface hover:border-y-border hover:border-r-border"
+      }`}>
+
       {isSuggestion && badgeText && (
         <span className="mb-3 self-start rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-600 dark:bg-amber-900/40 dark:text-amber-400">
           {badgeText}
@@ -126,10 +126,10 @@ export default function DocumentCard({
         <h3 className="line-clamp-2 min-h-[2.5rem] text-xl leading-tight font-bold tracking-tight text-foreground">
           {doc.title}
         </h3>
-        
+
         <div className="mt-1 flex items-center gap-1.5">
           {doc.uploaded_by && doc.uploader_name ? (
-            <Link 
+            <Link
               href={`/contributor/${doc.uploaded_by}`}
               className="truncate text-xs font-bold tracking-wider text-primary uppercase hover:underline"
               onClick={(e) => e.stopPropagation()}
@@ -142,7 +142,7 @@ export default function DocumentCard({
             </span>
           )}
         </div>
-        
+
         {/* Metadata */}
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm font-medium text-muted tabular-nums">
           <span>{doc.page_count ? `${doc.page_count} pgs` : getFileLabel(doc.file_url)}</span>
@@ -151,18 +151,21 @@ export default function DocumentCard({
           <span>·</span>
           <span>{getTimeAgo(doc.created_at ?? null)}</span>
         </div>
+        {showReadingProgress && doc.last_page && doc.page_count && doc.last_page < doc.page_count && (
+          <p className="mt-2 text-xs font-bold text-primary">Resume at page {doc.last_page}</p>
+        )}
       </div>
-      
+
       {/* Bottom action row: DL · View · Upvote */}
       <div className="mt-4 flex gap-2 border-t border-border pt-4">
         <button onClick={(e) => onDownload(e, doc)} className="motion-hover motion-active inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-hover py-2 text-sm font-bold text-foreground hover:border-primary/50">
           {isDownloading ? <InlineSpinner label="Downloading" size={13} /> : <Download size={13} />} DL
         </button>
-        
+
         <Link href={docHref} className="motion-hover motion-active inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-transparent bg-primary py-2 text-sm font-bold text-primary-foreground hover:opacity-90">
           <Eye size={13} /> View
         </Link>
-        
+
         {onToggleUpvote && (() => {
           const analyticsObj = Array.isArray(doc.document_analytics) ? doc.document_analytics[0] : doc.document_analytics;
           const displayCount = currentUpvoteCount !== undefined ? currentUpvoteCount : (analyticsObj?.upvotes || 0);

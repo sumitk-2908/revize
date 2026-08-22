@@ -659,18 +659,21 @@ export type Database = {
           accessed_at: string
           document_id: number
           id: number
+          last_page: number | null
           user_id: string
         }
         Insert: {
           accessed_at?: string
           document_id: number
           id?: number
+          last_page?: number | null
           user_id: string
         }
         Update: {
           accessed_at?: string
           document_id?: number
           id?: number
+          last_page?: number | null
           user_id?: string
         }
         Relationships: [

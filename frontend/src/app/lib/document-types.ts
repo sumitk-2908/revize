@@ -10,6 +10,7 @@ export type DocumentRecord = Pick<
 export type DocumentAnalytics = Database["public"]["Tables"]["document_analytics"]["Row"];
 
 export type DocumentWithAnalytics = DocumentRecord & {
+  last_page?: number | null;
   document_analytics?: Partial<DocumentAnalytics> | Partial<DocumentAnalytics>[] | null;
 };
 
