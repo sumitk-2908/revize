@@ -88,6 +88,11 @@ def _put_object_sync(key: str, data: bytes, content_type: str) -> None:
     )
 
 
+def _download_object_sync(key: str) -> bytes:
+    response = get_r2_client().get_object(Bucket=R2_BUCKET_NAME, Key=key)
+    return response["Body"].read()
+
+
 def _delete_objects_sync(keys: list[str]) -> None:
     if not keys:
         return
@@ -113,6 +118,11 @@ def key_from_public_url(url: Optional[str]) -> Optional[str]:
     if url.startswith(prefix):
         return url[len(prefix):]
     return None
+
+
+async def download_from_r2(key: str) -> bytes:
+    """Downloads an R2 object for maintenance jobs such as search backfills."""
+    return await asyncio.to_thread(_download_object_sync, key)
 
 
 async def upload_to_r2(key: str, data: bytes, content_type: str) -> str:

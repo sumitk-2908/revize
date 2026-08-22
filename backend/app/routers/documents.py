@@ -13,6 +13,7 @@ from app.file_types import (
     FileSpec,
     MAX_ANY_FILE_BYTES,
     allowed_extensions_label,
+    extract_text,
     spec_for_filename,
     thumbnail_key_for,
     verify_magic_bytes,
@@ -152,11 +153,12 @@ async def build_preview(spec: FileSpec, file_bytes: bytes) -> tuple[Optional[int
 class StoredUpload:
     """Result of validating one uploaded file and pushing it to R2."""
 
-    def __init__(self, file_url, thumbnail_url, file_size_mb, page_count, r2_keys):
+    def __init__(self, file_url, thumbnail_url, file_size_mb, page_count, content_text, r2_keys):
         self.file_url = file_url
         self.thumbnail_url = thumbnail_url
         self.file_size_mb = file_size_mb
         self.page_count = page_count
+        self.content_text = content_text
         self.r2_keys = r2_keys
 
 
@@ -194,6 +196,12 @@ async def validate_and_store_upload(
         raise HTTPException(status_code=400, detail=str(e))
 
     file_size_mb = round(len(file_bytes) / (1024 * 1024), 2)
+    try:
+        content_text = await asyncio.to_thread(extract_text, spec, file_bytes)
+    except Exception as e:
+        print(f"Warning: searchable text extraction failed for .{spec.ext}: {e}")
+        content_text = None
+
     page_count, thumbnail_bytes = await build_preview(spec, file_bytes)
 
     safe_filename = document_storage_key(title, subject, module_id, file.filename)
@@ -211,7 +219,7 @@ async def validate_and_store_upload(
             # Thumbnail failure is non-fatal — continue without it.
             print(f"Warning: Thumbnail upload failed: {e}")
 
-    return StoredUpload(public_url, thumbnail_url, file_size_mb, page_count, r2_keys)
+    return StoredUpload(public_url, thumbnail_url, file_size_mb, page_count, content_text, r2_keys)
 
 
 def _r2_keys_for_doc(doc: dict) -> list[str]:
@@ -293,6 +301,7 @@ async def upload_document(
             "page_count": stored.page_count,
             "thumbnail_url": stored.thumbnail_url,
             "status": secure_status,
+            "content_text": stored.content_text,
         }
 
         try:
@@ -409,6 +418,7 @@ def _apply_text_filter(db_query, query: str):
     tsquery = _prefix_tsquery(query)
     if tsquery:
         clauses.insert(0, f'fts.fts(english)."{tsquery}"')
+        clauses.insert(1, f'content_tsv.fts(english)."{tsquery}"')
 
     return db_query.or_(",".join(clauses))
 
@@ -716,6 +726,7 @@ async def resubmit_document(
             # Always overwrite the thumbnail, including to None, so replacing a
             # PDF with a .docx cannot leave a stale page-1 preview behind.
             update_payload["thumbnail_url"] = stored.thumbnail_url
+            update_payload["content_text"] = stored.content_text
 
             # Queue the old R2 objects for deletion after the DB update succeeds.
             old_r2_keys = _r2_keys_for_doc(existing_doc)

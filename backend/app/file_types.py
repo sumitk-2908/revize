@@ -15,7 +15,10 @@ import zipfile
 from dataclasses import dataclass
 from typing import Optional
 
+import fitz
+
 MB = 1024 * 1024
+MAX_EXTRACTED_TEXT_CHARS = 500_000
 
 
 @dataclass(frozen=True)
@@ -152,3 +155,21 @@ def _verify_text(data: bytes) -> None:
         data.decode("utf-8")
     except UnicodeDecodeError:
         raise ValueError("Text files must be UTF-8 encoded.")
+
+
+def extract_text(spec: FileSpec, data: bytes, max_chars: int = MAX_EXTRACTED_TEXT_CHARS) -> str | None:
+    """Extract searchable text for formats with reliable plain-text support.
+
+    Office documents and images are intentionally skipped in v1. PDF extraction
+    returns an empty string for image-only/scanned files, while the character
+    cap keeps unusually large documents from bloating a database row.
+    """
+    if spec.kind == "text":
+        text = data.decode("utf-8")
+    elif spec.kind == "pdf":
+        with fitz.open(stream=data, filetype="pdf") as document:
+            text = "\n".join(page.get_text("text") for page in document)
+    else:
+        return None
+
+    return text[:max_chars]
