@@ -3,8 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   ArrowLeft, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
-  Share2, Link as LinkIcon, Check, Maximize,
-  ThumbsUp, ThumbsDown, Flag, X,
+  Share2, Link as LinkIcon, Check, Maximize, Search, X,
+  ThumbsUp, ThumbsDown, Flag,
   Download, File as FileIcon, FileText, FileSpreadsheet, Presentation
 } from "lucide-react";
 import { usePathname, useRouter } from 'next/navigation';
@@ -22,6 +22,7 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import { InlineSpinner, SkeletonBlock } from "@/components/layout/SharedLayouts";
 import { dispatchToast as showToast } from "@/app/lib/toast";
 import { buildDownloadHref, getExtension, getFileKind, getFileLabel } from "@/app/lib/file-types";
+import { usePdfTextSearch } from "./usePdfTextSearch";
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -47,6 +48,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   const isPdf = fileKind === "pdf";
 
   const [numPages, setNumPages] = useState<number>(0);
+  const [pdfDocument, setPdfDocument] = useState<Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]> | null>(null);
   const [scale, setScale] = useState<number>(1.0);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -84,7 +86,9 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   // Zoom applies to the two rendered formats; text reflows and Office files
   // have no preview at all.
   const canZoom = isPdf || fileKind === "image";
-  
+
+  const pdfSearch = usePdfTextSearch(pdfDocument);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
   const hasTrackedView = useRef(false);
   const isDownloading = useRef(false);
@@ -122,14 +126,14 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   useEffect(() => {
     const trackAnalytics = async () => {
       if (!hasTrackedView.current && documentMeta) {
-        hasTrackedView.current = true; 
-        
+        hasTrackedView.current = true;
+
         await trackDocumentStat(documentMeta.id, 'view');
 
         const { data: sess } = await supabase.auth.getSession();
         if (sess?.session?.user?.id) {
-          logStudySessionMutation.mutate({ 
-            userId: sess.session.user.id, 
+          logStudySessionMutation.mutate({
+            userId: sess.session.user.id,
             documentId: documentMeta.id,
             doc: {
               ...documentMeta,
@@ -174,8 +178,9 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     return () => { cancelled = true; };
   }, [fileKind, documentMeta?.file_url]);
 
-  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
-    setNumPages(numPages);
+  function onDocumentLoadSuccess(document: Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>) {
+    setPdfDocument(document);
+    setNumPages(document.numPages);
   }
 
   // Page heights are cached per index once measured. Zooming or resizing changes
@@ -190,14 +195,27 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     rowVirtualizer.scrollToIndex(Math.min(Math.max(page, 1), numPages) - 1, { align: 'start' });
   }, [numPages, rowVirtualizer]);
 
+  useEffect(() => {
+    const firstMatch = pdfSearch.matches[0];
+    if (firstMatch) goToPage(firstMatch.pageNumber);
+  }, [goToPage, pdfSearch.matches]);
+
   const changePage = useCallback((offset: number) => {
     goToPage(currentPage + offset);
   }, [currentPage, goToPage]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't interfere with inputs or textareas
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && isPdf) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // Don't interfere with inputs or textareas, except Escape which closes search.
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        if (e.key !== 'Escape') return;
+      }
 
       if (e.key === 'ArrowRight') {
         if (isPdf) changePage(1);
@@ -208,12 +226,22 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
       } else if (e.key === '-') {
         if (canZoom) setScale(s => Math.max(s - 0.2, 0.6));
       } else if (e.key === 'Escape') {
-        router.back();
+        if (pdfSearch.query) {
+          pdfSearch.setQuery('');
+          searchInputRef.current?.blur();
+        } else {
+          router.back();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [changePage, router, isPdf, canZoom]);
+  }, [changePage, router, isPdf, canZoom, pdfSearch]);
+
+  const navigateSearch = useCallback((direction: 'next' | 'prev') => {
+    const match = direction === 'next' ? pdfSearch.next() : pdfSearch.prev();
+    if (match) goToPage(match.pageNumber);
+  }, [goToPage, pdfSearch]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -261,7 +289,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
 
   const handleToggleUpvote = async () => {
     if (!documentMeta) return;
-    
+
     const isUpvoted = userRating === true;
     try {
       const { data: sess } = await supabase.auth.getSession();
@@ -269,10 +297,10 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
 
       setUserRating(!isUpvoted); // optimistic
       setUpvotesCount((prev: number) => isUpvoted ? Math.max(0, prev - 1) : prev + 1);
-      
+
       const result = await toggleUpvote(documentMeta.id);
       if (result === null) throw new Error("Failed to toggle upvote");
-      
+
     } catch (error) {
       setUserRating(isUpvoted); // revert
       setUpvotesCount(isUpvoted ? upvotesCount + 1 : Math.max(0, upvotesCount - 1)); // revert
@@ -289,10 +317,10 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
       if (!sess?.session?.user?.id) return showToast("Action Required", "Please log in to flag content.", "error");
 
       const { error } = await supabase.from('document_flags').insert({
-          document_id: documentMeta.id,
-          user_id: sess.session.user.id,
-          reason: flagReason,
-          description: flagDescription
+        document_id: documentMeta.id,
+        user_id: sess.session.user.id,
+        reason: flagReason,
+        description: flagDescription
       });
 
       if (error && error.code === '23505') {
@@ -312,15 +340,15 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
 
   return (
     <div className="flex h-[calc(100vh-8rem)] w-full flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
-      
+
       {/* 1. Header: w-full ensures it takes full width for flex distributions */}
       <div className="flex min-h-[3.5rem] w-full shrink-0 flex-col justify-between gap-3 border-b border-border bg-surface-hover p-3 sm:flex-row sm:items-center sm:gap-4 sm:px-4 sm:py-2">
-        
+
         <button onClick={() => router.back()} className="motion-hover motion-active flex shrink-0 items-center gap-1.5 self-start rounded-xl px-2 py-1.5 text-sm font-bold text-muted hover:bg-surface-hover sm:gap-2 sm:self-auto sm:px-3">
           <ArrowLeft size={16} /> <span className="hidden sm:inline">Go Back</span><span className="sm:hidden">Back</span>
         </button>
-        
-       {/* 2. Text Container: items-center and text-center applied universally */}
+
+        {/* 2. Text Container: items-center and text-center applied universally */}
         <div className="flex w-full min-w-0 flex-1 flex-col items-center justify-center px-1 sm:px-4">
           <h1 className="w-full text-center text-base leading-tight font-extrabold break-words whitespace-normal text-foreground sm:text-sm">
             {documentMeta.title}
@@ -329,10 +357,10 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
             Uploaded by {documentMeta.uploader_name || 'Anonymous'}
           </p>
         </div>
-        
+
         {/* 3. Action Icons: Labels added for Report and Share to fill space evenly */}
         <div className="mt-2 flex w-full shrink-0 items-center justify-between gap-1 text-muted sm:mt-0 sm:w-auto sm:justify-end sm:gap-2">
-          
+
           <div className="flex shrink-0 items-center gap-1 border-r border-border pr-2 sm:mr-2 sm:pr-3">
             <button onClick={handleToggleUpvote} className={`motion-hover motion-active flex items-center gap-1.5 rounded-lg p-1.5 font-bold ${userRating === true ? 'bg-success/10 text-success' : 'text-muted hover:bg-success/10 hover:text-success'}`}>
               <ThumbsUp size={16} className={userRating === true ? 'fill-current' : ''} />
@@ -342,7 +370,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
 
           <button onClick={() => setIsFlagModalOpen(true)} className="motion-hover motion-active flex shrink-0 items-center gap-1.5 rounded-lg p-1.5 text-muted hover:bg-destructive/10 hover:text-destructive sm:mr-1">
             <Flag size={16} /> <span className="text-sm font-bold">Report</span>
-          </button> 
+          </button>
 
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
@@ -357,7 +385,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
                   {copied ? 'Copied!' : 'Copy Link'}
                 </DropdownMenu.Item>
                 <DropdownMenu.Item onClick={handleWhatsAppShare} className="motion-hover flex cursor-pointer items-center gap-2 rounded-lg p-2 text-sm font-semibold text-success outline-none hover:bg-success/10">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1  8 8v.5z"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1  8 8v.5z" /></svg>
                   WhatsApp
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
@@ -365,18 +393,38 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
           </DropdownMenu.Root>
 
           <a href={documentMeta.file_url} target="_blank" rel="noopener noreferrer" onClick={handleDownloadClick} className="motion-hover motion-active flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-primary hover:bg-primary/10 sm:px-3">
-             <span className="hidden sm:inline">{canZoom ? "FullScreen" : "Open"}</span> <Maximize size={14} />
+            <span className="hidden sm:inline">{canZoom ? "FullScreen" : "Open"}</span> <Maximize size={14} />
           </a>
         </div>
       </div>
 
       {canZoom && (
-        <div className="flex shrink-0 items-center justify-between border-b border-border bg-surface px-4 py-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2">
           <div className="flex items-center gap-1">
             <button aria-label="Zoom Out" onClick={() => setScale(s => Math.max(s - 0.2, 0.6))} className="motion-hover motion-active rounded-lg p-1.5 text-muted hover:bg-surface-hover"><ZoomOut size={18} aria-hidden="true" /></button>
             <span className="w-10 text-center text-sm font-bold text-foreground tabular-nums" aria-hidden="true">{Math.round(scale * 100)}%</span>
             <button aria-label="Zoom In" onClick={() => setScale(s => Math.min(s + 0.2, 2.5))} className="motion-hover motion-active rounded-lg p-1.5 text-muted hover:bg-surface-hover"><ZoomIn size={18} aria-hidden="true" /></button>
           </div>
+
+          {isPdf && (
+            <div className="flex min-w-0 flex-1 items-center justify-center gap-1 sm:order-2 sm:flex-none">
+              <Search size={16} className="shrink-0 text-muted" aria-hidden="true" />
+              <input
+                ref={searchInputRef}
+                aria-label="Search document text"
+                value={pdfSearch.query}
+                onChange={(event) => pdfSearch.setQuery(event.target.value)}
+                placeholder="Search in document"
+                className="motion-focus min-w-0 w-32 rounded-lg border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary sm:w-44"
+              />
+              <span aria-live="polite" className="w-16 shrink-0 text-center text-xs font-semibold text-muted tabular-nums">
+                {pdfSearch.isSearching ? 'Searching…' : pdfSearch.query ? `${pdfSearch.matches.length ? pdfSearch.activeIndex + 1 : 0}/${pdfSearch.matches.length}` : ''}
+              </span>
+              {pdfSearch.query && <button aria-label="Clear document search" onClick={() => pdfSearch.setQuery('')} className="motion-hover rounded-lg p-1 text-muted hover:bg-surface-hover hover:text-foreground"><X size={15} /></button>}
+              <button aria-label="Previous search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('prev')} className="motion-hover rounded-lg p-1 text-muted hover:bg-surface-hover disabled:opacity-40"><ChevronLeft size={16} /></button>
+              <button aria-label="Next search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('next')} className="motion-hover rounded-lg p-1 text-muted hover:bg-surface-hover disabled:opacity-40"><ChevronRight size={16} /></button>
+            </div>
+          )}
 
           {isPdf ? (
             <>
@@ -398,49 +446,50 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
 
       <div ref={containerRef} className="custom-scrollbar flex flex-1 justify-center overflow-auto bg-surface-hover p-4">
         {isPdf && (
-        <Document file={documentMeta.file_url} onLoadSuccess={onDocumentLoadSuccess} loading={<Loader2 className="mt-10 animate-spin text-primary" size={32} />} error={<p className="mt-10 text-xs text-destructive">Failed to load PDF. The file could not be fetched from storage.</p>}>
-          {containerWidth > 0 && numPages > 0 && (
-            <div
-              style={{
-                height: `${rowVirtualizer.getTotalSize()}px`,
-                width: `${containerWidth * 0.95}px`,
-                position: 'relative',
-              }}
-            >
-              {virtualItems.map((virtualRow) => (
-                <div
-                  key={virtualRow.index}
-                  /* measureElement reads data-index and reports the row's real
-                     height back, so scrollToIndex works on PDFs whose pages
-                     aren't A4 and at zoom levels the estimate can't predict.
-                     No fixed height here on purpose — that's what gets measured. */
-                  data-index={virtualRow.index}
-                  ref={rowVirtualizer.measureElement}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${virtualRow.start}px)`,
-                    display: 'flex',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <div className="mb-4 shadow-lg ring-1 ring-foreground/5 h-fit">
-                    <Page 
-                      pageNumber={virtualRow.index + 1} 
-                      scale={scale} 
-                      width={containerWidth * 0.95} 
-                      renderTextLayer={true} 
-                      renderAnnotationLayer={true} 
-                      loading={<SkeletonBlock className="h-[500px] w-full rounded-none" />} 
-                    />
+          <Document file={documentMeta.file_url} onLoadSuccess={onDocumentLoadSuccess} loading={<Loader2 className="mt-10 animate-spin text-primary" size={32} />} error={<p className="mt-10 text-xs text-destructive">Failed to load PDF. The file could not be fetched from storage.</p>}>
+            {containerWidth > 0 && numPages > 0 && (
+              <div
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  width: `${containerWidth * 0.95}px`,
+                  position: 'relative',
+                }}
+              >
+                {virtualItems.map((virtualRow) => (
+                  <div
+                    key={virtualRow.index}
+                    /* measureElement reads data-index and reports the row's real
+                       height back, so scrollToIndex works on PDFs whose pages
+                       aren't A4 and at zoom levels the estimate can't predict.
+                       No fixed height here on purpose — that's what gets measured. */
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                      display: 'flex',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <div className="mb-4 shadow-lg ring-1 ring-foreground/5 h-fit">
+                      <Page
+                        pageNumber={virtualRow.index + 1}
+                        scale={scale}
+                        width={containerWidth * 0.95}
+                        renderTextLayer={true}
+                        customTextRenderer={({ pageNumber, itemIndex, str }) => pdfSearch.getTextRenderer(pageNumber, itemIndex, str)}
+                        renderAnnotationLayer={true}
+                        loading={<SkeletonBlock className="h-[500px] w-full rounded-none" />}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Document>
+                ))}
+              </div>
+            )}
+          </Document>
         )}
 
         {fileKind === "image" && containerWidth > 0 && (

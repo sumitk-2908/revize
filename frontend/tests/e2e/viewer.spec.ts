@@ -9,7 +9,7 @@ test.describe('PDF Viewer Flow', () => {
 
     // Look for a document card link (assuming there's a trending or recent documents list)
     const documentLink = page.locator('a[href^="/document/"]').first();
-    
+
     if (await documentLink.isVisible()) {
       await documentLink.click();
 
@@ -29,6 +29,14 @@ test.describe('PDF Viewer Flow', () => {
         // Check if page number updated
         await expect(page.getByText(/page 2/i)).toBeVisible();
       }
+
+      // PDF-only in-viewer search is available once the document is open.
+      const searchInput = page.getByRole('textbox', { name: 'Search document text' });
+      await expect(searchInput).toBeVisible();
+      await searchInput.fill('the');
+      await expect(page.getByRole('button', { name: 'Next search result' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(searchInput).toHaveValue('');
     } else {
       console.log('No documents available on the home page to test the viewer.');
     }
