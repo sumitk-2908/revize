@@ -58,8 +58,13 @@ export const useLogStudySessionMutation = () => {
         try {
           const stored = localStorage.getItem("portal_study_history");
           let parsed = stored ? JSON.parse(stored) : [];
+          // `doc` is the document row, which carries no reading position, so
+          // carry the mirrored one across. Without this, opening a document
+          // erased the local copy of where the reader stopped — the copy the
+          // viewer falls back to when it cannot reach the database.
+          const mirrored = parsed.find((d: { id: number; last_page?: number | null }) => d.id === documentId);
           parsed = parsed.filter((d: any) => d.id !== documentId);
-          parsed.unshift(doc);
+          parsed.unshift(mirrored?.last_page ? { ...doc, last_page: mirrored.last_page } : doc);
           parsed = parsed.slice(0, 5);
           localStorage.setItem("portal_study_history", JSON.stringify(parsed));
         } catch (e) {

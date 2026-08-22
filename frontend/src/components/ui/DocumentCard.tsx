@@ -151,8 +151,11 @@ export default function DocumentCard({
           <span>·</span>
           <span>{getTimeAgo(doc.created_at ?? null)}</span>
         </div>
-        {showReadingProgress && doc.last_page && doc.page_count && doc.last_page < doc.page_count && (
-          <p className="mt-2 text-xs font-bold text-primary">Resume at page {doc.last_page}</p>
+        {/* Page 1 is not a position worth resuming to, and a document read to
+            its last page has nothing left to resume. Compared numerically so a
+            missing page_count cannot leak a bare 0 into the markup. */}
+        {showReadingProgress && (doc.last_page ?? 0) > 1 && (doc.last_page ?? 0) < (doc.page_count ?? 0) && (
+          <p className="mt-2 text-xs font-bold text-primary tabular-nums">Resume at page {doc.last_page}</p>
         )}
       </div>
 

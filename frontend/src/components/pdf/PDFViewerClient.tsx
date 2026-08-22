@@ -40,7 +40,11 @@ const UNSUPPORTED_ICONS: Record<string, typeof FileIcon> = {
 export default function PDFViewerClient({ documentMeta }: { documentMeta: any }) {
   const router = useRouter();
   const logStudySessionMutation = useLogStudySessionMutation();
-  const updateReadingProgressMutation = useUpdateReadingProgressMutation();
+  // `mutateAsync` is bound once by the mutation observer, so it is stable enough
+  // to appear in a dependency list. The object `useMutation` returns is not — it
+  // is a fresh literal every render, and depending on it re-armed the save
+  // debounce below on every render instead of on every page change.
+  const { mutateAsync: saveReadingProgress } = useUpdateReadingProgressMutation();
 
   // How this document renders is derived from the extension on its stored URL —
   // there is no file-type column, so this also covers every pre-existing row.
@@ -49,9 +53,24 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   const isPdf = fileKind === "pdf";
 
   const [numPages, setNumPages] = useState<number>(0);
-  const [resumePage, setResumePage] = useState<number | null>(null);
-  const [progressReady, setProgressReady] = useState(false);
-  const progressSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reading progress. `savedPage` is this document's stored position: null while
+  // it is still being fetched, 0 once we know there is nothing to go back to.
+  // `restored` gates the writer further down — it must not run before the stored
+  // position has been applied, or the debounce fires on page 1 and overwrites
+  // the very position it was about to restore. `resumedAt` only drives the notice.
+  const [savedPage, setSavedPage] = useState<number | null>(null);
+  const [restored, setRestored] = useState(false);
+  const [resumedAt, setResumedAt] = useState<number | null>(null);
+  const hasJumpedToSavedPage = useRef(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // What the stored row holds as far as we know, so the writer can skip work
+  // that would change nothing. 0 means no position is stored.
+  const storedPageRef = useRef(0);
+  // Latest values for the flush-on-exit path, which must not close over the page
+  // and gate as they stood when its listener was attached.
+  const currentPageRef = useRef(1);
+  const restoredRef = useRef(false);
   const [pdfDocument, setPdfDocument] = useState<Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]> | null>(null);
   const [scale, setScale] = useState<number>(1.0);
   const [containerWidth, setContainerWidth] = useState<number>(0);
@@ -187,40 +206,52 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     setNumPages(document.numPages);
   }
 
-  // Fetch the saved position after auth is available. Keep a local mirror so a
-  // position saved during a transient network failure is still useful locally.
+  // Fetch the stored position for this document. The localStorage mirror is the
+  // fallback: it is written alongside every save, so a position still resolves
+  // when the reader is offline, or signed out on a device they have used before.
   useEffect(() => {
-    if (!isPdf || !documentMeta?.id) return;
+    setSavedPage(null);
+    setRestored(false);
+    setResumedAt(null);
+    hasJumpedToSavedPage.current = false;
+    storedPageRef.current = 0;
+
+    if (!isPdf || !documentMeta?.id) {
+      setSavedPage(0);
+      return;
+    }
 
     let cancelled = false;
     const loadReadingProgress = async () => {
       const { data: sess } = await supabase.auth.getSession();
       const userId = sess?.session?.user?.id;
-      if (!userId) {
-        if (!cancelled) setProgressReady(true);
-        return;
+
+      let page: number | null = null;
+      if (userId) {
+        const { data } = await supabase
+          .from('study_history')
+          .select('last_page')
+          .eq('user_id', userId)
+          .eq('document_id', documentMeta.id)
+          .maybeSingle();
+        page = data?.last_page ?? null;
       }
 
-      const { data } = await supabase
-        .from('study_history')
-        .select('last_page')
-        .eq('user_id', userId)
-        .eq('document_id', documentMeta.id)
-        .maybeSingle();
-
-      let savedPage = data?.last_page ?? null;
-      if (!savedPage) {
+      if (!page) {
         try {
           const stored = JSON.parse(localStorage.getItem('portal_study_history') || '[]');
-          savedPage = stored.find((item: { id: number }) => item.id === documentMeta.id)?.last_page ?? null;
+          const mirrored = Array.isArray(stored)
+            ? stored.find((item: { id: number }) => item.id === documentMeta.id)
+            : null;
+          page = mirrored?.last_page ?? null;
         } catch {
-          savedPage = null;
+          page = null;
         }
       }
 
       if (!cancelled) {
-        setResumePage(savedPage);
-        setProgressReady(true);
+        storedPageRef.current = page ?? 0;
+        setSavedPage(page ?? 0);
       }
     };
 
@@ -228,32 +259,52 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     return () => { cancelled = true; };
   }, [documentMeta?.id, isPdf]);
 
-  useEffect(() => {
-    if (!isPdf || !progressReady || numPages < 1 || currentPage < 1) return;
-    if (progressSaveTimer.current) clearTimeout(progressSaveTimer.current);
+  const saveProgress = useCallback(async (page: number) => {
+    if (!documentMeta?.id || page < 1) return;
 
-    progressSaveTimer.current = setTimeout(async () => {
-      const { data: sess } = await supabase.auth.getSession();
-      const userId = sess?.session?.user?.id;
-      if (!userId) return;
-      try {
-        await updateReadingProgressMutation.mutateAsync({ userId, documentId: documentMeta.id, lastPage: currentPage });
-        try {
-          const stored = JSON.parse(localStorage.getItem('portal_study_history') || '[]');
-          const next = Array.isArray(stored) ? stored.map((item: { id: number }) => item.id === documentMeta.id ? { ...item, last_page: currentPage } : item) : [];
-          localStorage.setItem('portal_study_history', JSON.stringify(next));
-        } catch { /* localStorage is best effort */ }
-      } catch (error) {
-        console.warn('Failed to save reading progress:', error);
+    // Nothing worth writing: the row already holds this page, or the reader is
+    // on page 1 of a document they have no stored position in — every document
+    // opened would otherwise be stamped "resume at page 1". Page 1 *is* worth
+    // storing when it replaces a real position; that is how a reader who starts
+    // a document over stops being sent back to where they were.
+    if (page === storedPageRef.current) return;
+    if (page === 1 && storedPageRef.current === 0) return;
+
+    const { data: sess } = await supabase.auth.getSession();
+    const userId = sess?.session?.user?.id;
+    if (!userId) return;
+
+    // Claimed before the write so the debounce and the flush-on-exit below
+    // cannot both send the same page.
+    storedPageRef.current = page;
+
+    try {
+      await saveReadingProgress({ userId, documentId: documentMeta.id, lastPage: page });
+    } catch (error) {
+      console.warn('Failed to save reading progress:', error);
+    }
+
+    // Mirrored whether or not the write above landed — that is what lets the
+    // position survive a failed request. Only an entry already in the list is
+    // patched; seeding it is logStudySession's job.
+    try {
+      const stored = JSON.parse(localStorage.getItem('portal_study_history') || '[]');
+      if (Array.isArray(stored)) {
+        localStorage.setItem('portal_study_history', JSON.stringify(
+          stored.map((item: { id: number }) => (
+            item.id === documentMeta.id ? { ...item, last_page: page } : item
+          )),
+        ));
       }
-    }, 800);
+    } catch { /* localStorage is best effort */ }
+  }, [documentMeta?.id, saveReadingProgress]);
 
-    return () => {
-      if (progressSaveTimer.current) clearTimeout(progressSaveTimer.current);
-    };
-  }, [currentPage, documentMeta?.id, isPdf, numPages, progressReady, updateReadingProgressMutation]);
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+    restoredRef.current = restored;
+  }, [currentPage, restored]);
 
-  // Page heights are cached per index. Zooming or resizing changes every page's
+  // Page heights are cached per index once measured. Zooming or resizing changes
   // every one of them, so the cache has to be dropped or scrollToIndex keeps
   // aiming at stale offsets and lands on the wrong page.
   useEffect(() => {
@@ -264,6 +315,79 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     if (numPages === 0) return;
     rowVirtualizer.scrollToIndex(Math.min(Math.max(page, 1), numPages) - 1, { align: 'start' });
   }, [numPages, rowVirtualizer]);
+
+  // Resume where the reader stopped, once the PDF is loaded and laid out.
+  // The ref guard makes the jump strictly once per document: `containerWidth`
+  // and `numPages` below keep changing over a document's life — a window resize
+  // re-runs this effect — and without it every resize would drag the reader back
+  // to the saved page.
+  useEffect(() => {
+    if (hasJumpedToSavedPage.current || savedPage === null) return;
+
+    // Images, text and Office files have no page to return to. Unblock the
+    // writer so it does not sit armed forever, and stop.
+    if (!isPdf) {
+      hasJumpedToSavedPage.current = true;
+      setRestored(true);
+      return;
+    }
+
+    // scrollToIndex needs the row heights, which only exist once the document
+    // has loaded and the container has been measured.
+    if (numPages < 1 || containerWidth === 0) return;
+    hasJumpedToSavedPage.current = true;
+
+    if (savedPage <= 1 || savedPage > numPages) {
+      setRestored(true);
+      return;
+    }
+
+    goToPage(savedPage);
+    setResumedAt(savedPage);
+    // scrollToIndex re-aims as pages report their real heights, so currentPage
+    // is still in flight for a moment after the call. Hold the writer back
+    // until that settles instead of saving a page being scrolled past.
+    settleTimer.current = setTimeout(() => setRestored(true), 1500);
+  }, [savedPage, isPdf, numPages, containerWidth, goToPage]);
+
+  useEffect(() => () => {
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+  }, []);
+
+  // The notice retires itself; nobody should have to dismiss a confirmation.
+  useEffect(() => {
+    if (resumedAt === null) return;
+    const hide = setTimeout(() => setResumedAt(null), 8000);
+    return () => clearTimeout(hide);
+  }, [resumedAt]);
+
+  // One write per pause in reading, rather than one per page scrolled past.
+  useEffect(() => {
+    if (!isPdf || !restored || numPages < 1) return;
+    const timer = setTimeout(() => { void saveProgress(currentPage); }, 800);
+    return () => clearTimeout(timer);
+  }, [currentPage, isPdf, numPages, restored, saveProgress]);
+
+  // That debounce is dropped on unmount and when the tab goes away — exactly
+  // when the last position matters most — so flush on the way out.
+  // `visibilitychange` rather than `pagehide`: a merely hidden page can still
+  // finish the request.
+  useEffect(() => {
+    if (!isPdf) return;
+
+    const flush = () => {
+      if (restoredRef.current) void saveProgress(currentPageRef.current);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      flush();
+    };
+  }, [isPdf, saveProgress]);
 
   useEffect(() => {
     const firstMatch = pdfSearch.matches[0];
@@ -511,6 +635,27 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
           ) : (
             <span className="text-sm font-bold tracking-wider text-muted uppercase">{fileLabel}</span>
           )}
+        </div>
+      )}
+
+      {resumedAt !== null && (
+        <div role="status" className="flex shrink-0 flex-wrap items-center justify-center gap-1 border-b border-border bg-primary/5 px-4 py-2">
+          <span className="text-sm font-semibold text-foreground tabular-nums">
+            Picked up where you left off — page {resumedAt}
+          </span>
+          <button
+            onClick={() => { setResumedAt(null); goToPage(1); }}
+            className="motion-hover motion-active rounded-lg px-2 py-1 text-sm font-bold text-primary hover:bg-primary/10"
+          >
+            Back to page 1
+          </button>
+          <button
+            aria-label="Dismiss resume notice"
+            onClick={() => setResumedAt(null)}
+            className="motion-hover rounded-lg p-1 text-muted hover:bg-surface-hover hover:text-foreground"
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
         </div>
       )}
 

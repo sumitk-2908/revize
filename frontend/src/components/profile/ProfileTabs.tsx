@@ -187,6 +187,13 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold text-foreground">{item.title}</p>
                   <p className="truncate text-xs text-muted capitalize">{item.subject} • {item.category}</p>
+                  {/* Same guard as DocumentCard: page 1 is not a position, and a
+                      document read to its last page has nothing left to resume. */}
+                  {(item.last_page ?? 0) > 1 && (item.last_page ?? 0) < (item.page_count ?? 0) && (
+                    <p className="truncate text-xs font-bold text-primary tabular-nums">
+                      Page {item.last_page} of {item.page_count}
+                    </p>
+                  )}
                 </div>
                 <Link
                   href={documentHref(item)}
