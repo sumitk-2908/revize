@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { MessageSquare, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, MessageSquare, Loader2 } from "lucide-react";
 import { getComments, postComment } from "@/app/lib/api/comments";
 import { CommentInput } from "./CommentInput";
 import { CommentItem } from "./CommentItem";
@@ -20,6 +20,7 @@ export const CommentSection = ({ documentId }: CommentSectionProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [pendingDraft, setPendingDraft] = useState<string | null>(null);
+  const [isDiscussionExpanded, setIsDiscussionExpanded] = useState(false);
 
   const fetchComments = useCallback(async () => {
     setIsLoading(true);
@@ -36,12 +37,12 @@ export const CommentSection = ({ documentId }: CommentSectionProps) => {
   const commentTree = useMemo(() => {
     const map = new Map<string, any>();
     const roots: any[] = [];
-    
+
     // First pass: map all comments
     comments.forEach(c => {
       map.set(c.id, { ...c, children: [] });
     });
-    
+
     // Second pass: build tree
     comments.forEach(c => {
       const node = map.get(c.id);
@@ -51,7 +52,7 @@ export const CommentSection = ({ documentId }: CommentSectionProps) => {
         roots.push(node);
       }
     });
-    
+
     // Roots are already ordered by is_pinned then created_at from the DB query
     return roots;
   }, [comments]);
@@ -98,59 +99,75 @@ export const CommentSection = ({ documentId }: CommentSectionProps) => {
   };
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-border bg-surface shadow-sm overflow-hidden">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-hover px-4 py-3 sm:px-6">
-        <MessageSquare size={18} className="text-primary" />
-        <h2 className="text-base font-extrabold text-foreground tracking-tight">Discussion</h2>
-        <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary tabular-nums">
+    <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
+      <button
+        type="button"
+        onClick={() => setIsDiscussionExpanded((expanded) => !expanded)}
+        aria-expanded={isDiscussionExpanded}
+        aria-controls="document-discussion-content"
+        className="motion-hover flex w-full shrink-0 items-center gap-2 border-b border-border bg-surface-hover px-4 py-3 text-left hover:bg-background sm:px-6"
+      >
+        <MessageSquare size={18} className="text-primary" aria-hidden="true" />
+        <span className="text-base font-extrabold tracking-tight text-foreground">Discussion</span>
+        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold tabular-nums text-primary">
           {comments.length}
         </span>
-      </div>
-      
-      {/* Sticky comment input area at the top of the scrollable section */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-        <div className="sticky top-0 z-10 border-b border-border bg-surface/95 px-4 py-4 backdrop-blur sm:px-6">
-          <CommentInput 
-            documentId={documentId} 
-            onSubmit={handleTopLevelSubmit} 
-            placeholder="What are your thoughts on this document?"
-          />
-        </div>
-
-        <div className="px-4 py-4 sm:px-6 pb-20">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted">
-              <Loader2 size={24} className="animate-spin mb-2" />
-              <span className="text-sm font-bold">Loading comments...</span>
-            </div>
-          ) : commentTree.length > 0 ? (
-            <div className="space-y-4">
-              {commentTree.map(comment => (
-                <CommentItem 
-                  key={comment.id} 
-                  comment={comment} 
-                  documentId={documentId} 
-                  onRefresh={fetchComments}
-                  onReplyPrompt={handleReplyPrompt}
-                />
-              ))}
-            </div>
+        <span className="ml-auto flex items-center gap-2 text-xs font-bold text-muted">
+          {isDiscussionExpanded ? "Collapse" : "Expand"}
+          {isDiscussionExpanded ? (
+            <ChevronUp size={16} aria-hidden="true" />
           ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted mb-3">
-                <MessageSquare size={24} />
-              </div>
-              <p className="text-sm font-bold text-foreground">No comments yet</p>
-              <p className="mt-1 text-sm text-muted">Be the first to share your thoughts or ask a question.</p>
-            </div>
+            <ChevronDown size={16} aria-hidden="true" />
           )}
-        </div>
-      </div>
+        </span>
+      </button>
 
-      <InlineProfileSetupModal 
-        isOpen={showProfileSetup} 
-        onOpenChange={setShowProfileSetup} 
-        onSuccess={handleProfileSetupSuccess} 
+      {isDiscussionExpanded && (
+        /* Sticky comment input area at the top of the scrollable section */
+        <div id="document-discussion-content" className="relative flex-1 overflow-y-auto custom-scrollbar">
+          <div className="sticky top-0 z-10 border-b border-border bg-surface/95 px-4 py-4 backdrop-blur sm:px-6">
+            <CommentInput
+              documentId={documentId}
+              onSubmit={handleTopLevelSubmit}
+              placeholder="What are your thoughts on this document?"
+            />
+          </div>
+
+          <div className="px-4 py-4 sm:px-6 pb-20">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted">
+                <Loader2 size={24} className="animate-spin mb-2" />
+                <span className="text-sm font-bold">Loading comments...</span>
+              </div>
+            ) : commentTree.length > 0 ? (
+              <div className="space-y-4">
+                {commentTree.map(comment => (
+                  <CommentItem
+                    key={comment.id}
+                    comment={comment}
+                    documentId={documentId}
+                    onRefresh={fetchComments}
+                    onReplyPrompt={handleReplyPrompt}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted mb-3">
+                  <MessageSquare size={24} />
+                </div>
+                <p className="text-sm font-bold text-foreground">No comments yet</p>
+                <p className="mt-1 text-sm text-muted">Be the first to share your thoughts or ask a question.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <InlineProfileSetupModal
+        isOpen={showProfileSetup}
+        onOpenChange={setShowProfileSetup}
+        onSuccess={handleProfileSetupSuccess}
       />
     </div>
   );
