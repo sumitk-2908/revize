@@ -80,10 +80,10 @@ export const OnboardingModal = () => {
             </Dialog.Description>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {errorMsg && <p className="text-sm font-semibold text-destructive">{errorMsg}</p>}
+            {errorMsg && <p role="alert" className="text-sm font-semibold text-destructive">{errorMsg}</p>}
             <div>
-              <label className="mb-1 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Display Name *</label>
-              <input required type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Doe" className="motion-focus h-11 w-full rounded-xl border border-border bg-background px-4 text-sm text-foreground outline-none focus:border-primary" />
+              <label htmlFor="onboarding-name" className="mb-1 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Display Name *</label>
+              <input id="onboarding-name" required type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Doe" className="motion-focus h-11 w-full rounded-xl border border-border bg-background px-4 text-sm text-foreground outline-none focus:border-primary" />
             </div>
             
             <div className="grid grid-cols-2 gap-3">
@@ -115,12 +115,13 @@ export const OnboardingModal = () => {
             <p className="-mt-2 text-xs text-muted">We use these to show the subjects for your branch and year first.</p>
 
             <div>
-              <label className="mb-2 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Favorite Subjects (Max 5)</label>
+              <label htmlFor="onboarding-subjects" className="mb-2 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Favorite Subjects (Max 5)</label>
               <div className="relative">
                 <div className="motion-focus flex items-center gap-2 rounded-xl border border-border bg-background p-2 focus-within:border-primary focus-within:bg-surface">
                   <Search size={16} className="ml-1 text-muted" />
-                  <input 
-                    type="text" 
+                  <input
+                    id="onboarding-subjects"
+                    type="text"
                     placeholder={favoriteSubjects.length < 5 ? "Search subjects..." : "Maximum subjects reached"}
                     value={subjectQuery}
                     onChange={(e) => setSubjectQuery(e.target.value)}
@@ -154,8 +155,13 @@ export const OnboardingModal = () => {
                   {favoriteSubjects.map(subject => (
                      <span key={subject} className="flex items-center gap-1 rounded-full bg-primary/10 py-1 pr-1 pl-3 text-xs font-bold text-primary">
                       {subject}
-                      <button type="button" onClick={() => setFavoriteSubjects(favoriteSubjects.filter(s => s !== subject))} className="motion-hover rounded-full p-1 text-primary hover:bg-primary/20">
-                        <X size={12} />
+                      <button
+                        type="button"
+                        aria-label={`Remove ${subject}`}
+                        onClick={() => setFavoriteSubjects(favoriteSubjects.filter(s => s !== subject))}
+                        className="motion-hover rounded-full p-1 text-primary hover:bg-primary/20"
+                      >
+                        <X size={12} aria-hidden="true" />
                       </button>
                     </span>
                   ))}

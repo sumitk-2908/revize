@@ -252,3 +252,189 @@ body {
 .animate-fade-up {
   animation: v0-fade-up 0.4s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
+
+/* ========================================= */
+/* RADIX UI ENTER / EXIT ANIMATION SYSTEM    */
+/* Port of tailwindcss-animate for TW v4     */
+/* ========================================= */
+
+/*
+ * Composable enter/exit keyframes.
+ * Each modifier utility sets a CSS custom property; the base
+ * animate-in / animate-out keyframe reads them all together.
+ * This is exactly how tailwindcss-animate works internally.
+ */
+
+/* --- Keyframes ---------------------------------------- */
+
+@keyframes radix-enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform:
+      translate(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0))
+      scale(var(--tw-enter-scale, 1))
+      rotate(var(--tw-enter-rotate, 0));
+  }
+}
+
+@keyframes radix-exit {
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform:
+      translate(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0))
+      scale(var(--tw-exit-scale, 1))
+      rotate(var(--tw-exit-rotate, 0));
+  }
+}
+
+/* --- Base animate-in / animate-out -------------------- */
+
+@layer utilities {
+
+  .animate-in {
+    animation-name: radix-enter;
+    animation-duration: 200ms;
+    animation-fill-mode: both;
+  }
+
+  .animate-out {
+    animation-name: radix-exit;
+    animation-duration: 150ms;
+    animation-fill-mode: both;
+  }
+
+  /* --- Fade enter modifiers ----------------------------- */
+
+  .fade-in   { --tw-enter-opacity: 0; }
+  .fade-in-0 { --tw-enter-opacity: 0; }
+
+  /* --- Fade exit modifiers ------------------------------ */
+
+  .fade-out   { --tw-exit-opacity: 0; }
+  .fade-out-0 { --tw-exit-opacity: 0; }
+
+  /* --- Zoom enter modifiers ----------------------------- */
+
+  .zoom-in-90 { --tw-enter-scale: .90; }
+  .zoom-in-95 { --tw-enter-scale: .95; }
+  .zoom-in-100 { --tw-enter-scale: 1; }
+
+  /* --- Zoom exit modifiers ------------------------------ */
+
+  .zoom-out-90 { --tw-exit-scale: .90; }
+  .zoom-out-95 { --tw-exit-scale: .95; }
+
+  /* --- Slide-in-from (enter translate) ------------------ */
+
+  /* Top (positive Y goes down, so entering from top = negative) */
+  .slide-in-from-top-2  { --tw-enter-translate-y: -0.5rem; }
+  .slide-in-from-top-4  { --tw-enter-translate-y: -1rem; }
+  .slide-in-from-top-8  { --tw-enter-translate-y: -2rem; }
+
+  /* Percentage-based top (for dialog centering) */
+  .slide-in-from-top-\[48\%\]  { --tw-enter-translate-y: -48%; }
+
+  /* Left (positive X goes right, so entering from left = negative) */
+  .slide-in-from-left-1\/2    { --tw-enter-translate-x: -50%; }
+  .slide-in-from-left-\[50\%\] { --tw-enter-translate-x: -50%; }
+
+  /* Bottom */
+  .slide-in-from-bottom-2 { --tw-enter-translate-y: 0.5rem; }
+  .slide-in-from-bottom-4 { --tw-enter-translate-y: 1rem; }
+
+  /* Right */
+  .slide-in-from-right-2 { --tw-enter-translate-x: 0.5rem; }
+
+  /* --- Slide-out-to (exit translate) -------------------- */
+
+  /* Top */
+  .slide-out-to-top-4         { --tw-exit-translate-y: -1rem; }
+  .slide-out-to-top-\[48\%\]  { --tw-exit-translate-y: -48%; }
+
+  /* Left */
+  .slide-out-to-left-1\/2     { --tw-exit-translate-x: -50%; }
+  .slide-out-to-left-\[50\%\] { --tw-exit-translate-x: -50%; }
+
+  /* Bottom */
+  .slide-out-to-bottom-2 { --tw-exit-translate-y: 0.5rem; }
+
+  /* Right */
+  .slide-out-to-right-full { --tw-exit-translate-x: 100%; }
+
+  /* --- Radix Toast swipe-out animation ------------------ */
+  /* Radix sets data-[swipe=end] when the user completes a swipe */
+  [data-radix-toast-viewport] [data-state="open"] {
+    animation-name: radix-enter;
+    animation-duration: 250ms;
+    animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+    animation-fill-mode: both;
+    --tw-enter-translate-x: 100%;
+    --tw-enter-opacity: 0;
+  }
+
+  [data-radix-toast-viewport] [data-state="closed"] {
+    animation-name: radix-exit;
+    animation-duration: 200ms;
+    animation-timing-function: ease-in;
+    animation-fill-mode: both;
+    --tw-exit-translate-x: 100%;
+    --tw-exit-opacity: 0;
+  }
+
+  [data-radix-toast-viewport] [data-swipe="end"] {
+    animation: radix-exit 100ms ease-out forwards;
+    --tw-exit-translate-x: var(--radix-toast-swipe-end-x);
+  }
+
+  [data-radix-toast-viewport] [data-swipe="cancel"] {
+    transform: translateX(0);
+    transition: transform 200ms ease-out;
+  }
+
+  [data-radix-toast-viewport] [data-swipe="move"] {
+    transform: translateX(var(--radix-toast-swipe-move-x));
+    transition: none;
+  }
+}
+
+/* ========================================= */
+/* REDUCED MOTION                            */
+/* Respects the OS "Reduce Motion" setting.  */
+/* Must be last so it wins specificity.      */
+/* ========================================= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0.01ms !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+
+  /* Radix Dialog/Popover/Toast: remove enter/exit motion entirely */
+  .animate-in,
+  .animate-out {
+    animation: none !important;
+  }
+
+  /* Page-level fade-up entrance */
+  .animate-fade-up {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Toast swipe animation */
+  [data-radix-toast-viewport] [data-state="open"],
+  [data-radix-toast-viewport] [data-state="closed"],
+  [data-radix-toast-viewport] [data-swipe="end"] {
+    animation: none !important;
+    transform: none !important;
+  }
+}

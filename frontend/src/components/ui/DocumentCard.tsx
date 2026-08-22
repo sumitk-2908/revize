@@ -161,28 +161,45 @@ export default function DocumentCard({
 
       {/* Bottom action row: DL · View · Upvote */}
       <div className="mt-4 flex gap-2 border-t border-border pt-4">
-        <button onClick={(e) => onDownload(e, doc)} className="motion-hover motion-active inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-hover py-2 text-sm font-bold text-foreground hover:border-primary/50">
-          {isDownloading ? <InlineSpinner label="Downloading" size={13} /> : <Download size={13} />} DL
+        <button
+          aria-label={isDownloading ? `Downloading ${doc.title}` : `Download ${doc.title}`}
+          onClick={(e) => onDownload(e, doc)}
+          className="motion-hover motion-active inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-hover py-2 text-sm font-bold text-foreground hover:border-primary/50"
+        >
+          {isDownloading ? <InlineSpinner label="Downloading" size={13} /> : <Download size={13} aria-hidden="true" />} DL
         </button>
 
-        <Link href={docHref} className="motion-hover motion-active inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-transparent bg-primary py-2 text-sm font-bold text-primary-foreground hover:opacity-90">
-          <Eye size={13} /> View
+        <Link
+          href={docHref}
+          aria-label={`View ${doc.title}`}
+          className="motion-hover motion-active inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-transparent bg-primary py-2 text-sm font-bold text-primary-foreground hover:opacity-90"
+        >
+          <Eye size={13} aria-hidden="true" /> View
         </Link>
 
         {onToggleUpvote && (() => {
           const analyticsObj = Array.isArray(doc.document_analytics) ? doc.document_analytics[0] : doc.document_analytics;
           const displayCount = currentUpvoteCount !== undefined ? currentUpvoteCount : (analyticsObj?.upvotes || 0);
           return (
-            <button onClick={() => onToggleUpvote(doc.id)} className={`motion-hover motion-active flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-bold ${isUpvoted ? "border-success bg-success/10 text-success hover:bg-success/20" : "border-border text-muted hover:border-success/50 hover:text-success"}`}>
-              <ThumbsUp size={14} className={isUpvoted ? "fill-success" : ""} />
+            <button
+              onClick={() => onToggleUpvote(doc.id)}
+              aria-label={`${isUpvoted ? "Remove upvote from" : "Upvote"} ${doc.title}, ${displayCount} upvote${displayCount !== 1 ? "s" : ""}`}
+              aria-pressed={isUpvoted}
+              className={`motion-hover motion-active flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-bold ${isUpvoted ? "border-success bg-success/10 text-success hover:bg-success/20" : "border-border text-muted hover:border-success/50 hover:text-success"}`}
+            >
+              <ThumbsUp size={14} aria-hidden="true" className={isUpvoted ? "fill-success" : ""} />
               {displayCount}
             </button>
           );
         })()}
 
         {isAdmin && onDelete && (
-          <button onClick={() => onDelete(doc.id)} className="motion-hover motion-active rounded-xl border border-destructive/30 p-2 text-destructive hover:bg-destructive/10">
-            <Trash2 size={14} />
+          <button
+            aria-label={`Delete ${doc.title}`}
+            onClick={() => onDelete(doc.id)}
+            className="motion-hover motion-active rounded-xl border border-destructive/30 p-2 text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 size={14} aria-hidden="true" />
           </button>
         )}
       </div>

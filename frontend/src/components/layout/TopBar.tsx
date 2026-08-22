@@ -55,16 +55,21 @@ export const TopBar = () => {
       const isCmdK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
       const targetNodeName = (event.target as HTMLElement)?.nodeName;
       const isSlash = event.key === "/" && targetNodeName !== "INPUT" && targetNodeName !== "TEXTAREA";
-      
+
       if (isCmdK || isSlash) {
         event.preventDefault();
         setIsCommandOpen(true);
+      }
+
+      // Close notifications panel on Escape
+      if (event.key === "Escape" && showNotifications) {
+        setShowNotifications(false);
       }
     };
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, []);
+  }, [showNotifications, setShowNotifications]);
 
   return (
   <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur-xl">
@@ -104,22 +109,38 @@ export const TopBar = () => {
         
         {(isAdmin || isStudent) && (
           <div className="relative">
-            <button aria-label="Notifications" onClick={() => setShowNotifications(!showNotifications)} className="relative flex size-9 items-center justify-center rounded-xl border border-border transition-colors hover:bg-surface-hover">
-              <Bell size={18} className="text-muted" />
-              {unreadCount > 0 && <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-xs font-bold text-white shadow-sm ring-2 ring-surface">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+            <button
+              aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+              aria-haspopup="dialog"
+              aria-expanded={showNotifications}
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative flex size-9 items-center justify-center rounded-xl border border-border transition-colors hover:bg-surface-hover"
+            >
+              <Bell size={18} className="text-muted" aria-hidden="true" />
+              {unreadCount > 0 && (
+                <span aria-hidden="true" className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-xs font-bold text-white shadow-sm ring-2 ring-surface">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </button>
             {showNotifications && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
                 <ErrorBoundary title="Notifications could not load" className="m-2" message="Notifications panel hit an unexpected problem.">
-                <div className="animate-in slide-in-from-top-2 motion-dropdown absolute top-12 -right-2 z-50 w-[320px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-surface shadow-2xl sm:right-0 sm:w-80">
+                <div
+                  role="dialog"
+                  aria-label="Notifications"
+                  aria-modal="false"
+                  className="animate-in slide-in-from-top-2 motion-dropdown absolute top-12 -right-2 z-50 w-[320px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-surface shadow-2xl sm:right-0 sm:w-80"
+                >
                   <div className="flex items-center justify-between border-b border-border p-3">
                     <p className="text-xs font-bold tracking-wider text-muted uppercase">Notifications</p>
                     <div className="flex items-center gap-2">
                       {notifications.some((n) => n.is_read) && (
-                        <button 
+                        <button
+                          aria-label="Clear read notifications"
                           onClick={async () => {
-                            if(window.confirm("Are you sure you want to clear all read notifications?")) {
+                            if (window.confirm("Are you sure you want to clear all read notifications?")) {
                               const { data: sess } = await supabase.auth.getSession();
                               if (sess?.session?.user) {
                                 const { error } = await supabase.from('notifications').delete().eq('user_id', sess.session.user.id).eq('is_read', true);
@@ -158,14 +179,18 @@ export const TopBar = () => {
         {(isAdmin || isStudent) ? (
           <div className="flex items-center gap-3">
             <DiscoveryTooltip featureKey="upload_button" text="Share your notes and help others" side="bottom" align="end">
-              <button onClick={() => {
-                if (isAdmin || userProfile.full_name) {
-                  setShowUploadForm(true);
-                } else {
-                  setShowProfileGate(true);
-                }
-              }} className="motion-hover motion-active flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground hover:opacity-90 sm:px-4">
-                <Plus size={14} /> <span>{isAdmin ? "Upload" : "Contribute"}</span>
+              <button
+                aria-label={isAdmin ? "Upload a document" : "Contribute a document"}
+                onClick={() => {
+                  if (isAdmin || userProfile.full_name) {
+                    setShowUploadForm(true);
+                  } else {
+                    setShowProfileGate(true);
+                  }
+                }}
+                className="motion-hover motion-active flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground hover:opacity-90 sm:px-4"
+              >
+                <Plus size={14} aria-hidden="true" /> <span>{isAdmin ? "Upload" : "Contribute"}</span>
               </button>
             </DiscoveryTooltip>
             <div className="hidden sm:block">
@@ -174,8 +199,12 @@ export const TopBar = () => {
           </div>
         ) : (
           <DiscoveryTooltip featureKey="upload_button" text="Share your notes and help others" side="bottom" align="end">
-            <button onClick={() => openAuthPrompt("upload")} className="motion-hover motion-active flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 sm:px-4">
-              <Plus size={14} /> <span>Contribute</span>
+            <button
+              aria-label="Contribute a document"
+              onClick={() => openAuthPrompt("upload")}
+              className="motion-hover motion-active flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 sm:px-4"
+            >
+              <Plus size={14} aria-hidden="true" /> <span>Contribute</span>
             </button>
           </DiscoveryTooltip>
         )}
