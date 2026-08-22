@@ -17,8 +17,8 @@ export const getDocumentsByModule = async (moduleId: number): Promise<DocumentWi
 };
 
 export const getPaginatedDocumentsByModule = async (
-  moduleId: number, 
-  page = 1, 
+  moduleId: number,
+  page = 1,
   limit = 20,
   category?: string,
   sortBy: string = "created_at",
@@ -57,8 +57,8 @@ export const getPaginatedDocumentsByModule = async (
   }
 
   const hasMore = count ? fromIndex + (data?.length || 0) < count : false;
-  return { 
-    data: (data as unknown as DocumentWithAnalytics[]) || [], 
+  return {
+    data: (data as unknown as DocumentWithAnalytics[]) || [],
     nextCursor: hasMore ? page + 1 : null,
     total: count || 0
   };
@@ -115,6 +115,21 @@ export const searchDocuments = async (options: SearchOptions = {}) => {
 
 export type UploadState = "idle" | "uploading" | "processing" | "success" | "error";
 
+export type DuplicateDocument = {
+  id: number;
+  title: string;
+  subject?: string | null;
+  module_id?: number | null;
+  category?: string | null;
+  slug?: string | null;
+  status?: string | null;
+};
+
+export type DuplicateUploadError = Error & {
+  code: "duplicate_upload";
+  existingDocument?: DuplicateDocument;
+};
+
 export const uploadWithProgress = (
   endpointUrl: string,
   formData: FormData,
@@ -126,7 +141,7 @@ export const uploadWithProgress = (
     const xhr = new XMLHttpRequest();
     xhr.open("POST", endpointUrl, true);
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    
+
     // Office files may be up to 75MB; 2 minutes was not enough headroom for a
     // slow upstream link plus the server-side validation and R2 write.
     xhr.timeout = 300000;
@@ -138,7 +153,7 @@ export const uploadWithProgress = (
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
         const percentComplete = Math.round((event.loaded / event.total) * 100);
-        
+
         if (percentComplete >= 100) {
           onProgress(99);
           onStateChange("processing");
@@ -156,10 +171,21 @@ export const uploadWithProgress = (
       } else {
         onStateChange("error");
         let errorMsg = "Upload failed on the server.";
+        let duplicateError: DuplicateUploadError | null = null;
         try {
-          errorMsg = JSON.parse(xhr.responseText).detail || errorMsg;
-        } catch (e) {}
-        reject(new Error(errorMsg));
+          const response = JSON.parse(xhr.responseText);
+          const detail = response.detail;
+          if (xhr.status === 409 && detail?.code === "duplicate_upload") {
+            errorMsg = detail.message;
+            duplicateError = Object.assign(new Error(errorMsg), {
+              code: "duplicate_upload" as const,
+              existingDocument: detail.existing_document,
+            });
+          } else {
+            errorMsg = typeof detail === "string" ? detail : detail?.message || errorMsg;
+          }
+        } catch (e) { }
+        reject(duplicateError || new Error(errorMsg));
       }
     };
 
@@ -185,12 +211,12 @@ export const uploadDocument = async (
 ) => {
   try {
     let { data: { session } } = await supabase.auth.getSession();
-    
+
     if (session?.expires_at && (session.expires_at * 1000) - Date.now() < 60000) {
       const { data } = await supabase.auth.refreshSession();
       session = data.session;
     }
-    
+
     const endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/documents/upload/`;
 
     const response = await uploadWithProgress(

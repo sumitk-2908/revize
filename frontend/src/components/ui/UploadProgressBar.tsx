@@ -1,6 +1,7 @@
 "use client";
 
-import { UploadCloud, CheckCircle, AlertCircle, ServerCog } from "lucide-react";
+import Link from "next/link";
+import { UploadCloud, CheckCircle, AlertCircle, ServerCog, ExternalLink } from "lucide-react";
 import { UploadState } from "@/app/lib/api/documents";
 
 interface UploadProgressBarProps {
@@ -8,6 +9,7 @@ interface UploadProgressBarProps {
   progress: number;
   fileName?: string;
   errorMessage?: string;
+  existingDocumentHref?: string;
 }
 
 export default function UploadProgressBar({
@@ -15,6 +17,7 @@ export default function UploadProgressBar({
   progress,
   fileName,
   errorMessage,
+  existingDocumentHref,
 }: UploadProgressBarProps) {
   if (state === "idle") return null;
 
@@ -25,15 +28,14 @@ export default function UploadProgressBar({
           {/* Dynamic Icon based on state */}
           <div
             className={`flex size-10 items-center justify-center rounded-xl text-white transition-colors
-            ${
-              state === "uploading"
+            ${state === "uploading"
                 ? "bg-blue-500"
                 : state === "processing"
                   ? "bg-amber-500"
                   : state === "success"
                     ? "bg-emerald-500"
                     : "bg-red-500"
-            }`}
+              }`}
           >
             {state === "uploading" && (
               <UploadCloud size={20} className="animate-pulse" />
@@ -54,11 +56,19 @@ export default function UploadProgressBar({
               {state === "error" && "Upload Failed"}
             </h4>
 
-            <p className="line-clamp-1 text-xs text-muted">
+            <p className="text-xs text-muted">
               {state === "error"
                 ? errorMessage
                 : fileName || "Large files may take a moment to process."}
             </p>
+            {state === "error" && existingDocumentHref && (
+              <Link
+                href={existingDocumentHref}
+                className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+              >
+                View existing document <ExternalLink size={12} />
+              </Link>
+            )}
           </div>
         </div>
 
@@ -74,14 +84,13 @@ export default function UploadProgressBar({
       <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
         <div
           className={`h-full rounded-full transition-all duration-300 ease-out
-            ${
-              state === "error"
-                ? "bg-red-500"
-                : state === "success"
-                  ? "bg-emerald-500"
-                  : state === "processing"
-                    ? "bg-amber-500"
-                    : "bg-blue-500"
+            ${state === "error"
+              ? "bg-red-500"
+              : state === "success"
+                ? "bg-emerald-500"
+                : state === "processing"
+                  ? "bg-amber-500"
+                  : "bg-blue-500"
             }`}
           style={{ width: `${progress}%` }}
         />

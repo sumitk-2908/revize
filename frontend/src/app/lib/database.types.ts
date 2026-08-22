@@ -282,6 +282,7 @@ export type Database = {
           created_at: string | null
           file_size: number | null
           file_url: string
+          file_sha256: string | null
           fts: unknown
           id: number
           moderated_by: string | null
@@ -307,6 +308,7 @@ export type Database = {
           created_at?: string | null
           file_size?: number | null
           file_url: string
+          file_sha256?: string | null
           fts?: unknown
           id?: number
           moderated_by?: string | null
@@ -329,6 +331,7 @@ export type Database = {
           created_at?: string | null
           file_size?: number | null
           file_url?: string
+          file_sha256?: string | null
           fts?: unknown
           id?: number
           moderated_by?: string | null

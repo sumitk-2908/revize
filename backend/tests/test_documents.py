@@ -1,11 +1,14 @@
 import io
 import zipfile
+import hashlib
 
 import pytest
+from fastapi import HTTPException, UploadFile
 from unittest.mock import patch, MagicMock, AsyncMock
 from app.main import app
 from app.auth import verify_token, verify_admin
 from app.storage import document_storage_key
+from app.routers.documents import validate_and_store_upload
 
 
 def _make_ooxml(part_prefix: str) -> bytes:
@@ -74,6 +77,15 @@ def mock_upload_file_docx_spoofed():
         _make_ooxml("xl/"),
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
+
+def _mock_duplicate_lookup(mock_supabase, rows):
+    response = MagicMock()
+    response.data = rows
+    query = MagicMock()
+    query.limit.return_value.execute.return_value = response
+    mock_supabase.table.return_value.select.return_value.eq.return_value = query
+    return query
+
 
 @pytest.fixture(autouse=True)
 def clear_overrides():
@@ -198,6 +210,87 @@ def _mock_supabase_student_insert(mock_supabase, inserted_row):
 
     mock_supabase.table.side_effect = side_effect
     return mock_docs_table
+
+@pytest.mark.asyncio
+@patch("app.routers.documents.upload_to_r2", new_callable=AsyncMock)
+@patch("app.routers.documents.supabase")
+async def test_duplicate_upload_returns_conflict_before_r2(mock_supabase, mock_upload_r2):
+    content = b"# Existing notes\n"
+    existing = {
+        "id": 42,
+        "title": "Existing notes",
+        "subject": "CS",
+        "module_id": 1,
+        "category": "notes",
+        "slug": "existing-notes",
+        "status": "approved",
+    }
+    _mock_duplicate_lookup(mock_supabase, [existing])
+
+    with pytest.raises(HTTPException) as raised:
+        await validate_and_store_upload(
+            UploadFile(io.BytesIO(content), filename="notes.md", size=len(content)),
+            "New notes",
+            "CS",
+            1,
+        )
+
+    assert raised.value.status_code == 409
+    assert raised.value.detail["code"] == "duplicate_upload"
+    assert raised.value.detail["existing_document"] == existing
+    mock_upload_r2.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@patch("app.routers.documents.upload_to_r2", new_callable=AsyncMock)
+@patch("app.routers.documents.supabase")
+async def test_one_byte_different_upload_is_stored(mock_supabase, mock_upload_r2):
+    content = b"# Revision notes\n"
+    changed_content = content[:-1] + b"!"
+    _mock_duplicate_lookup(mock_supabase, [])
+    mock_upload_r2.return_value = "https://r2.dev/notes.md"
+
+    stored = await validate_and_store_upload(
+        UploadFile(
+            io.BytesIO(changed_content),
+            filename="notes.md",
+            size=len(changed_content),
+        ),
+        "Revision notes",
+        "CS",
+        None,
+    )
+
+    assert stored.file_sha256 == hashlib.sha256(changed_content).hexdigest()
+    mock_upload_r2.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_resubmit_duplicate_lookup_excludes_current_document(monkeypatch):
+    from app.routers import documents
+
+    content = b"# Same document\n"
+    response = MagicMock(data=[])
+    query = MagicMock()
+    query.limit.return_value.execute.return_value = response
+    documents.supabase = MagicMock()
+    documents.supabase.table.return_value.select.return_value.eq.return_value = query
+    monkeypatch.setattr(
+        documents,
+        "upload_to_r2",
+        AsyncMock(return_value="https://r2.dev/same.md"),
+    )
+
+    await documents.validate_and_store_upload(
+        UploadFile(io.BytesIO(content), filename="same.md", size=len(content)),
+        "Same document",
+        "CS",
+        None,
+        exclude_document_id=17,
+    )
+
+    query.neq.assert_called_once_with("id", 17)
+
 
 @pytest.mark.asyncio
 @patch("app.routers.documents.supabase")

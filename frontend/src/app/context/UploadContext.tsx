@@ -1,7 +1,12 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
-import { uploadDocument, UploadState } from "@/app/lib/api/documents";
+import {
+  uploadDocument,
+  UploadState,
+  DuplicateDocument,
+  DuplicateUploadError,
+} from "@/app/lib/api/documents";
 import { useSubjects, getIsNonModuleSubject } from "@/app/hooks/useSubjects";
 import { useAuth } from "@/app/context/AuthContext";
 import { dispatchToast as showToast } from "@/app/lib/toast";
@@ -19,6 +24,7 @@ interface UploadContextType {
   uploadState: UploadState;
   uploadProgress: number;
   uploadErrorMsg: string;
+  duplicateDocument: DuplicateDocument | null;
 
   setShowUploadForm: (v: boolean) => void;
   setFile: (v: File | null) => void;
@@ -34,7 +40,7 @@ const UploadContext = createContext<UploadContextType | undefined>(undefined);
 export function UploadProvider({ children }: { children: React.ReactNode }) {
   const { isAdmin, isStudent, uploadedBy, openAuthPrompt } = useAuth();
   const queryClient = useQueryClient();
-  
+
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -45,6 +51,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadErrorMsg, setUploadErrorMsg] = useState("");
+  const [duplicateDocument, setDuplicateDocument] = useState<DuplicateDocument | null>(null);
 
   const { data: subjects = [] } = useSubjects();
 
@@ -81,45 +88,49 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    setUploadState("idle"); 
-    setUploadProgress(0); 
-    setUploadErrorMsg(""); 
+    setUploadState("idle");
+    setUploadProgress(0);
+    setUploadErrorMsg("");
+    setDuplicateDocument(null);
     setUploading(true);
 
     const formData = new FormData();
     const authorName = uploadedBy || (isAdmin ? "Admin" : "Student");
-    formData.append("file", file); 
-    formData.append('title', uploadTitle); 
-    formData.append('uploader_name', authorName); 
-    formData.append("category", uploadCategory); 
+    formData.append("file", file);
+    formData.append('title', uploadTitle);
+    formData.append('uploader_name', authorName);
+    formData.append("category", uploadCategory);
     const isModuleDisabled = uploadCategory === "syllabus" || getIsNonModuleSubject(subjects, uploadSubject);
     formData.append("module_id", isModuleDisabled ? "null" : String(uploadModule));
-    formData.append("uploaded_by", authorName); 
-    formData.append("subject", uploadSubject); 
+    formData.append("uploaded_by", authorName);
+    formData.append("subject", uploadSubject);
     formData.append("status", isAdmin ? "approved" : "pending");
 
     try {
       await uploadDocument(formData, (percent) => setUploadProgress(percent), (state) => setUploadState(state));
       setTimeout(async () => {
-        setFile(null); 
-        setUploadTitle(""); 
-        setShowUploadForm(false); 
-        setUploadState("idle"); 
+        setFile(null);
+        setUploadTitle("");
+        setShowUploadForm(false);
+        setUploadState("idle");
         setUploading(false);
         queryClient.invalidateQueries({ queryKey: ['documents'] });
         if (!isAdmin) showToast("Success", "Notes submitted! Pending admin approval.", "success");
       }, 1500);
-    } catch (err: any) {
-      setUploadState("error"); 
-      setUploadErrorMsg(err.message || "Failed to upload file."); 
+    } catch (err: unknown) {
+      const error = err as Partial<DuplicateUploadError> & { message?: string };
+      const message = error.message || "Failed to upload file.";
+      setUploadState("error");
+      setUploadErrorMsg(message);
+      setDuplicateDocument(error.code === "duplicate_upload" ? error.existingDocument || null : null);
       setUploading(false);
-      showToast("Upload Error", err.message || "Failed to upload file.", "error");
+      showToast("Upload Error", message, "error");
     }
   };
 
   return (
     <UploadContext.Provider value={{
-      showUploadForm, uploading, file, uploadTitle, uploadCategory, uploadSubject, uploadModule, uploadState, uploadProgress, uploadErrorMsg,
+      showUploadForm, uploading, file, uploadTitle, uploadCategory, uploadSubject, uploadModule, uploadState, uploadProgress, uploadErrorMsg, duplicateDocument,
       setShowUploadForm, setFile, setUploadTitle, setUploadCategory, setUploadSubject, setUploadModule, handleUpload
     }}>
       {children}

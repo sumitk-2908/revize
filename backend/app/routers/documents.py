@@ -4,6 +4,7 @@ import asyncio
 import fitz
 import json
 import base64
+import hashlib
 from enum import Enum
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException, Request, Depends
 from app.auth import verify_admin, verify_token, assert_aal2
@@ -153,12 +154,13 @@ async def build_preview(spec: FileSpec, file_bytes: bytes) -> tuple[Optional[int
 class StoredUpload:
     """Result of validating one uploaded file and pushing it to R2."""
 
-    def __init__(self, file_url, thumbnail_url, file_size_mb, page_count, content_text, r2_keys):
+    def __init__(self, file_url, thumbnail_url, file_size_mb, page_count, content_text, file_sha256, r2_keys):
         self.file_url = file_url
         self.thumbnail_url = thumbnail_url
         self.file_size_mb = file_size_mb
         self.page_count = page_count
         self.content_text = content_text
+        self.file_sha256 = file_sha256
         self.r2_keys = r2_keys
 
 
@@ -167,6 +169,7 @@ async def validate_and_store_upload(
     title: str,
     subject: str,
     module_id: Optional[int],
+    exclude_document_id: Optional[int] = None,
 ) -> StoredUpload:
     """
     The single upload code path, shared by POST /upload/ and POST /{id}/resubmit.
@@ -195,6 +198,27 @@ async def validate_and_store_upload(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    file_sha256 = hashlib.sha256(file_bytes).hexdigest()
+    duplicate_query = (
+        supabase.table("documents")
+        .select("id, title, subject, module_id, category, slug, status")
+        .eq("file_sha256", file_sha256)
+    )
+    if exclude_document_id is not None:
+        duplicate_query = duplicate_query.neq("id", exclude_document_id)
+    duplicate_response = duplicate_query.limit(1).execute()
+    duplicate_rows = duplicate_response.data if isinstance(duplicate_response.data, list) else []
+    if duplicate_rows:
+        duplicate = duplicate_rows[0]
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "duplicate_upload",
+                "message": "This file already exists in the portal.",
+                "existing_document": duplicate,
+            },
+        )
+
     file_size_mb = round(len(file_bytes) / (1024 * 1024), 2)
     try:
         content_text = await asyncio.to_thread(extract_text, spec, file_bytes)
@@ -219,7 +243,7 @@ async def validate_and_store_upload(
             # Thumbnail failure is non-fatal — continue without it.
             print(f"Warning: Thumbnail upload failed: {e}")
 
-    return StoredUpload(public_url, thumbnail_url, file_size_mb, page_count, content_text, r2_keys)
+    return StoredUpload(public_url, thumbnail_url, file_size_mb, page_count, content_text, file_sha256, r2_keys)
 
 
 def _r2_keys_for_doc(doc: dict) -> list[str]:
@@ -302,6 +326,7 @@ async def upload_document(
             "thumbnail_url": stored.thumbnail_url,
             "status": secure_status,
             "content_text": stored.content_text,
+            "file_sha256": stored.file_sha256,
         }
 
         try:
@@ -718,7 +743,7 @@ async def resubmit_document(
 
         # --- Handle optional file replacement ---
         if file and file.filename:
-            stored = await validate_and_store_upload(file, title, subject, safe_module_id)
+            stored = await validate_and_store_upload(file, title, subject, safe_module_id, document_id)
 
             update_payload["file_url"] = stored.file_url
             update_payload["file_size"] = stored.file_size_mb
@@ -727,6 +752,7 @@ async def resubmit_document(
             # PDF with a .docx cannot leave a stale page-1 preview behind.
             update_payload["thumbnail_url"] = stored.thumbnail_url
             update_payload["content_text"] = stored.content_text
+            update_payload["file_sha256"] = stored.file_sha256
 
             # Queue the old R2 objects for deletion after the DB update succeeds.
             old_r2_keys = _r2_keys_for_doc(existing_doc)
