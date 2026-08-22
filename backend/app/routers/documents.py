@@ -1,6 +1,5 @@
 import os
 import re
-import uuid
 import asyncio
 import fitz
 import json
@@ -8,7 +7,7 @@ import base64
 from enum import Enum
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException, Request, Depends
 from app.auth import verify_admin, verify_token, assert_aal2
-from app.storage import upload_to_r2, delete_from_r2, key_from_public_url
+from app.storage import upload_to_r2, delete_from_r2, key_from_public_url, document_storage_key
 from app.config import settings
 from app.file_types import (
     FileSpec,
@@ -161,7 +160,12 @@ class StoredUpload:
         self.r2_keys = r2_keys
 
 
-async def validate_and_store_upload(file: UploadFile) -> StoredUpload:
+async def validate_and_store_upload(
+    file: UploadFile,
+    title: str,
+    subject: str,
+    module_id: Optional[int],
+) -> StoredUpload:
     """
     The single upload code path, shared by POST /upload/ and POST /{id}/resubmit.
 
@@ -192,9 +196,7 @@ async def validate_and_store_upload(file: UploadFile) -> StoredUpload:
     file_size_mb = round(len(file_bytes) / (1024 * 1024), 2)
     page_count, thumbnail_bytes = await build_preview(spec, file_bytes)
 
-    # Unique prefix prevents filename collisions in the bucket.
-    unique_prefix = uuid.uuid4().hex[:8]
-    safe_filename = f"{unique_prefix}_{file.filename.replace(' ', '_')}"
+    safe_filename = document_storage_key(title, subject, module_id, file.filename)
     safe_thumb_key = thumbnail_key_for(safe_filename)
 
     public_url = await upload_to_r2(safe_filename, file_bytes, spec.content_type)
@@ -275,7 +277,7 @@ async def upload_document(
     try:
         safe_module_id = None if module_id == "null" else int(module_id)
 
-        stored = await validate_and_store_upload(file)
+        stored = await validate_and_store_upload(file, title, subject, safe_module_id)
 
         # --- Insert metadata into Supabase DB ---
         category_val = category.value if hasattr(category, "value") else category
@@ -706,7 +708,7 @@ async def resubmit_document(
 
         # --- Handle optional file replacement ---
         if file and file.filename:
-            stored = await validate_and_store_upload(file)
+            stored = await validate_and_store_upload(file, title, subject, safe_module_id)
 
             update_payload["file_url"] = stored.file_url
             update_payload["file_size"] = stored.file_size_mb

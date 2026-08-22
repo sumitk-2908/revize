@@ -5,6 +5,7 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from app.main import app
 from app.auth import verify_token, verify_admin
+from app.storage import document_storage_key
 
 
 def _make_ooxml(part_prefix: str) -> bytes:
@@ -78,6 +79,26 @@ def mock_upload_file_docx_spoofed():
 def clear_overrides():
     yield
     app.dependency_overrides.clear()
+
+def test_document_storage_key_uses_title_hierarchy_and_sanitizes_segments():
+    key = document_storage_key(
+        "  Unit 1 / Exam Notes  ",
+        "Data\\ Structures",
+        3,
+        "original-name.PDF",
+    )
+
+    parts = key.split("/")
+    assert parts[0:3] == ["subjects", "Data_ Structures", "module-3"]
+    assert parts[3] == "Unit 1 _ Exam Notes.pdf"
+    assert ".." not in parts
+
+
+def test_document_storage_key_uses_general_for_non_module_uploads():
+    key = document_storage_key("Syllabus", "Operating Systems", None, "source.pdf")
+
+    assert key == "subjects/Operating Systems/general/Syllabus.pdf"
+
 
 @pytest.mark.asyncio
 async def test_upload_unsupported_extension(mock_upload_file_unsupported, test_client):
@@ -199,6 +220,7 @@ async def test_upload_markdown_success(mock_upload_r2, mock_supabase, mock_uploa
     assert payload["thumbnail_url"] is None
     # Stored as text/plain so an .md full of markup can never execute on R2.
     assert mock_upload_r2.call_args[0][2] == "text/plain; charset=utf-8"
+    assert mock_upload_r2.call_args[0][0] == "subjects/CS/general/Test Doc.md"
 
 @pytest.mark.asyncio
 @patch("app.routers.documents.supabase")

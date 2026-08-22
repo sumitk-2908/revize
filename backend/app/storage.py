@@ -21,6 +21,7 @@ for the synchronous PyMuPDF work in documents.py.
 
 import asyncio
 import os
+import re
 from typing import Optional
 
 import boto3
@@ -36,6 +37,31 @@ if not all([R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAM
     print("WARNING: Missing one or more R2_* environment variables. Storage calls will fail.")
 
 _r2_client = None
+
+
+def _safe_path_segment(value: Optional[str], fallback: str) -> str:
+    """Sanitize a user-provided storage path segment without losing readability."""
+    segment = re.sub(r"[\x00-\x1f\x7f]", "", (value or "")).strip()
+    segment = re.sub(r"[\\/]+", "_", segment)
+    segment = re.sub(r"\s+", " ", segment).strip(" .")
+    return segment or fallback
+
+
+def document_storage_key(
+    title: str,
+    subject: str,
+    module_id: Optional[int],
+    filename: Optional[str],
+) -> str:
+    """Build a readable key using the contributor-provided document title."""
+    extension = os.path.splitext(filename or "")[1].lower()
+    subject_segment = _safe_path_segment(subject, "General")
+    module_segment = _safe_path_segment(
+        f"module-{module_id}" if module_id is not None else "general",
+        "general",
+    )
+    title_segment = _safe_path_segment(title, "document")
+    return f"subjects/{subject_segment}/{module_segment}/{title_segment}{extension}"
 
 
 def get_r2_client():
