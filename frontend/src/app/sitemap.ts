@@ -26,7 +26,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Fetch approved documents to extract subjects, modules, and document IDs
   const { data: documents } = await supabase
     .from('documents')
-    .select('id, subject, module_id, updated_at')
+    .select('id, slug, subject, module_id, updated_at')
     .eq('status', 'approved');
 
   if (documents && documents.length > 0) {
@@ -47,9 +47,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         
         const currentSlug = subjectSlugMap.get(doc.subject) || generateFallbackSlug(doc.subject);
 
-        // Add individual document route
+        // Add individual document route (title slug, id only as a fallback)
         routes.push({
-          url: `${baseUrl}/subject/${currentSlug}/module-${doc.module_id}/${doc.id}`,
+          url: `${baseUrl}/subject/${currentSlug}/module-${doc.module_id}/${doc.slug || doc.id}`,
           lastModified: new Date(doc.updated_at || Date.now()),
           changeFrequency: 'weekly',
           priority: 0.6,

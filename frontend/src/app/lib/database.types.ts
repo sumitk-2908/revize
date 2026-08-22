@@ -285,6 +285,9 @@ export type Database = {
           moderated_by: string | null
           module_id: number | null
           page_count: number | null
+          // Generated column: slugified title, used as the document's URL
+          // segment. Read-only — omitted from Insert/Update on purpose.
+          slug: string | null
           status: string | null
           subject: string
           thumbnail_url: string | null
@@ -541,6 +544,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      study_activity: {
+        Row: {
+          activity_date: string
+          interaction_count: number
+          user_id: string
+        }
+        Insert: {
+          activity_date: string
+          interaction_count?: number
+          user_id: string
+        }
+        Update: {
+          activity_date?: string
+          interaction_count?: number
+          user_id?: string
+        }
+        Relationships: []
       }
       study_history: {
         Row: {

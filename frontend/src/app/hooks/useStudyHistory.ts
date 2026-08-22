@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getRecentStudyActivity, getFullStudyHistory, logStudySession } from '@/app/lib/api/history';
+import { getRecentStudyActivity, getFullStudyHistory, getStudyActivityCalendar, logStudySession } from '@/app/lib/api/history';
 import { dispatchToast } from '@/app/lib/toast';
 
 export const useRecentStudyHistory = (userId?: string) => {
@@ -15,6 +15,15 @@ export const useFullStudyHistory = (userId?: string) => {
     queryKey: ['studyHistory', 'full', userId],
     queryFn: () => getFullStudyHistory(userId),
     enabled: true,
+  });
+};
+
+/** Per-day study activity for the profile heatmap. */
+export const useStudyActivityCalendar = (userId?: string) => {
+  return useQuery({
+    queryKey: ['studyActivity', 'calendar', userId],
+    queryFn: () => getStudyActivityCalendar(userId),
+    enabled: !!userId,
   });
 };
 
@@ -79,6 +88,10 @@ export const useLogStudySessionMutation = () => {
     onSettled: (data, error, variables) => {
       queryClient.invalidateQueries({ queryKey: ['studyHistory', 'recent', variables.userId] });
       queryClient.invalidateQueries({ queryKey: ['studyHistory', 'full', variables.userId] });
+      // update_study_streak() stamps today into study_activity on the same
+      // visit, so the heatmap's cell for today needs a refetch too.
+      queryClient.invalidateQueries({ queryKey: ['studyActivity', 'calendar', variables.userId] });
+      queryClient.invalidateQueries({ queryKey: ['profile', 'streak', variables.userId] });
     },
   });
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/app/lib/api/core";
 import { getAchievements } from "@/app/lib/api/profile";
 import { Tables } from "@/app/lib/database.types";
@@ -30,6 +31,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const [globalToast, setGlobalToast] = useState({ open: false, title: "", message: "", type: "default" as "default" | "error" | "success" });
   
   const earnedBadgesRef = useRef<Set<string>>(new Set());
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const handlePortalToast = (event: Event) => {
@@ -50,7 +52,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
     const setupDataAndListeners = async (userId: string) => {
       const initialBadges = await getAchievements(userId);
-      earnedBadgesRef.current = new Set(initialBadges.map((b: any) => b.badge_id));
+      earnedBadgesRef.current = new Set(initialBadges.map((b: any) => b.badge_type));
 
       const { data: notifs } = await supabase
         .from('notifications')
@@ -67,18 +69,31 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       achieveChannel = supabase
         .channel(`achievements-${userId}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_achievements', filter: `user_id=eq.${userId}` }, (payload: any) => {
-            const newBadgeId = payload.new.badge_id;
-            if (!earnedBadgesRef.current.has(newBadgeId)) {
-              earnedBadgesRef.current.add(newBadgeId); 
+            // The column is badge_type. Reading badge_id gave undefined, and
+            // since the initial Set was then a Set of undefined, has() returned
+            // true for any user holding at least one badge — suppressing the
+            // toast entirely. Users with no badges got the generic fallback text
+            // because none of the lookup keys below matched a real badge id.
+            const newBadgeId = payload.new.badge_type;
+            if (newBadgeId && !earnedBadgesRef.current.has(newBadgeId)) {
+              earnedBadgesRef.current.add(newBadgeId);
+              // Keys must match the badge_type values awarded by the triggers in
+              // supabase/migrations/20260822000002_achievements_rework.sql and
+              // the tiles in components/profile/AchievementsList.tsx.
               const badgeLookup: Record<string, {title: string, desc: string}> = {
-                "first_upload": { title: "First Contribution", desc: "You uploaded your first resource." },
-                "streak_3": { title: "On Fire", desc: "3 day study streak!" },
-                "streak_7": { title: "Dedicated Scholar", desc: "7 day study streak!" },
-                "power_user": { title: "Power User", desc: "Downloaded 10 documents." },
-                "top_contributor": { title: "Top Contributor", desc: "Your uploads reached 50 views." }
+                "explorer": { title: "Explorer", desc: "You opened 3 documents." },
+                "curator": { title: "Curator", desc: "You bookmarked 3 resources." },
+                "streak_3": { title: "3 Day Streak", desc: "3 day study streak!" },
+                "pioneer": { title: "Pioneer", desc: "You uploaded your first resource." },
+                "scholar": { title: "Scholar", desc: "You opened 15 different documents." },
+                "contributor": { title: "Top Contributor", desc: "You got 3 uploads approved." },
+                "downloads_10": { title: "Impact Maker", desc: "Your uploads reached 10 downloads." },
+                "streak_7": { title: "7 Day Streak", desc: "7 day study streak!" }
               };
               const badgeInfo = badgeLookup[newBadgeId] || { title: "New Badge", desc: "You earned a new achievement!" };
               setActiveToast({ title: badgeInfo.title, description: badgeInfo.desc });
+              // Keep the profile's Achievements tab in step with the toast.
+              queryClient.invalidateQueries({ queryKey: ['profile', 'achievements', userId] });
             }
           })
         .subscribe();
@@ -141,7 +156,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       cleanupListeners();
       subscription.unsubscribe();
     };
-  }, []);
+  }, [queryClient]);
 
   const handleMarkAsRead = async (id: string, isRead: boolean) => {
     if (isRead) return;

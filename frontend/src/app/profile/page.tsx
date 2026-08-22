@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/api/core";
 import { useBookmarks } from "@/app/hooks/useBookmarks";
-import { useFullStudyHistory } from "@/app/hooks/useStudyHistory";
+import { useFullStudyHistory, useStudyActivityCalendar } from "@/app/hooks/useStudyHistory";
 import { useSubjects } from "@/app/hooks/useSubjects";
 import { useStudyStreak, useAchievements, useEnhancedContributions } from "@/app/hooks/useProfile";
 import { requestAuthPrompt } from "@/app/lib/auth-prompts";
@@ -34,6 +34,7 @@ function ProfileContent() {
 
   const { data: bookmarks = [], isLoading: loadingBookmarks } = useBookmarks(user?.id);
   const { data: history = [], isLoading: loadingHistory } = useFullStudyHistory(user?.id);
+  const { data: studyActivity = [] } = useStudyActivityCalendar(user?.id);
   const { data: subjects = [], isLoading: loadingSubjects } = useSubjects();
   const { data: streak = null, isLoading: loadingStreak } = useStudyStreak(user?.id);
   const { data: achievements = [], isLoading: loadingAchievements } = useAchievements(user?.id);
@@ -113,6 +114,7 @@ function ProfileContent() {
       <ProfileTabs
         user={user}
         history={history}
+        studyActivity={studyActivity}
         bookmarks={bookmarks}
         uploads={uploads}
         achievements={achievements}

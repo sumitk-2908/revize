@@ -21,18 +21,21 @@ import { buildDownloadHref } from "@/app/lib/file-types";
 import { Tables } from "@/app/lib/database.types";
 import { User } from "@supabase/supabase-js";
 import { useLogStudySessionMutation } from "@/app/hooks/useStudyHistory";
+import type { StudyActivityDay } from "@/app/lib/api/history";
 import { useQueryClient } from "@tanstack/react-query";
-import { subjectSlug } from "@/components/layout/utils";
+import { documentHref } from "@/components/layout/utils";
 
 interface ProfileTabsProps {
   user: User | null;
   history: DocumentWithAnalytics[];
+  /** Per-day study activity; drives the heatmap. */
+  studyActivity?: StudyActivityDay[];
   bookmarks: DocumentWithAnalytics[];
   uploads: DocumentWithAnalytics[];
   achievements: Tables<'user_achievements'>[];
 }
 
-export default function ProfileTabs({ user, history, bookmarks, uploads, achievements }: ProfileTabsProps) {
+export default function ProfileTabs({ user, history, studyActivity = [], bookmarks, uploads, achievements }: ProfileTabsProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const [suggestions, setSuggestions] = useState<DocumentWithAnalytics[]>([]);
   const [showContributionPrompt, setShowContributionPrompt] = useState(false);
@@ -138,9 +141,9 @@ export default function ProfileTabs({ user, history, bookmarks, uploads, achieve
 
       {activeTab === "overview" && (
         <div className="animate-fade-up">
-          {history.length > 0 && (
+          {(history.length > 0 || studyActivity.length > 0) && (
             <ErrorBoundary title="Activity chart could not load" message="The activity heatmap hit an unexpected problem.">
-              <ActivityHeatmap history={history} />
+              <ActivityHeatmap history={history} activity={studyActivity} />
             </ErrorBoundary>
           )}
           
@@ -159,8 +162,8 @@ export default function ProfileTabs({ user, history, bookmarks, uploads, achieve
                   <p className="truncate text-sm font-bold text-foreground">{item.title}</p>
                   <p className="truncate text-xs text-muted capitalize">{item.subject} • {item.category}</p>
                 </div>
-                <Link 
-                  href={`/subject/${item.subject ? subjectSlug(item.subject) : 'unknown'}/module-${item.module_id || 1}/${item.id}`}
+                <Link
+                  href={documentHref(item)}
                   onClick={() => handleViewDocument(item.id)}
                   className="motion-hover motion-active flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground uppercase hover:opacity-90"
                 >
@@ -218,8 +221,8 @@ export default function ProfileTabs({ user, history, bookmarks, uploads, achieve
                       <p className="truncate text-sm font-bold text-foreground">{item.title}</p>
                       <p className="truncate text-xs text-muted capitalize">{item.subject} • {item.category}</p>
                     </div>
-                    <Link 
-                      href={`/subject/${item.subject ? subjectSlug(item.subject) : 'unknown'}/module-${item.module_id || 1}/${item.id}`}
+                    <Link
+                      href={documentHref(item)}
                       onClick={() => handleViewDocument(item.id)}
                       className="motion-hover motion-active flex shrink-0 items-center gap-1.5 rounded-lg bg-warning px-3 py-1.5 text-xs font-bold text-white uppercase hover:opacity-90"
                     >
@@ -244,8 +247,8 @@ export default function ProfileTabs({ user, history, bookmarks, uploads, achieve
                </div>
                
                <div className="flex shrink-0 items-center gap-2">
-                 <Link 
-                   href={`/subject/${item.subject ? subjectSlug(item.subject) : 'unknown'}/module-${item.module_id || 1}/${item.id}`}
+                 <Link
+                   href={documentHref(item)}
                    onClick={() => handleViewDocument(item.id)}
                    className="motion-hover motion-active flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground uppercase hover:opacity-90"
                  >

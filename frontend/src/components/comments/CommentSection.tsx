@@ -99,18 +99,21 @@ export const CommentSection = ({ documentId }: CommentSectionProps) => {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
+    /* Height is deliberately content-driven: collapsed, this is just the header
+       bar. The page used to wrap it in a `calc(100vh - 6.5rem)` box, which
+       reserved a full screen of empty space even while collapsed. */
+    <div className="flex flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
       <button
         type="button"
         onClick={() => setIsDiscussionExpanded((expanded) => !expanded)}
         aria-expanded={isDiscussionExpanded}
         aria-controls="document-discussion-content"
-        className="motion-hover flex w-full shrink-0 items-center gap-2 border-b border-border bg-surface-hover px-4 py-3 text-left hover:bg-background sm:px-6"
+        className="motion-hover flex w-full shrink-0 items-center gap-2 bg-surface-hover px-4 py-3 text-left hover:bg-background sm:px-6"
       >
         <MessageSquare size={18} className="text-primary" aria-hidden="true" />
         <span className="text-base font-extrabold tracking-tight text-foreground">Discussion</span>
         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold tabular-nums text-primary">
-          {comments.length}
+          {isLoading ? "—" : comments.length}
         </span>
         <span className="ml-auto flex items-center gap-2 text-xs font-bold text-muted">
           {isDiscussionExpanded ? "Collapse" : "Expand"}
@@ -124,7 +127,10 @@ export const CommentSection = ({ documentId }: CommentSectionProps) => {
 
       {isDiscussionExpanded && (
         /* Sticky comment input area at the top of the scrollable section */
-        <div id="document-discussion-content" className="relative flex-1 overflow-y-auto custom-scrollbar">
+        <div
+          id="document-discussion-content"
+          className="custom-scrollbar relative max-h-[70vh] flex-1 overflow-y-auto border-t border-border"
+        >
           <div className="sticky top-0 z-10 border-b border-border bg-surface/95 px-4 py-4 backdrop-blur sm:px-6">
             <CommentInput
               documentId={documentId}
@@ -133,7 +139,7 @@ export const CommentSection = ({ documentId }: CommentSectionProps) => {
             />
           </div>
 
-          <div className="px-4 py-4 sm:px-6 pb-20">
+          <div className="px-4 py-4 sm:px-6">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-12 text-muted">
                 <Loader2 size={24} className="animate-spin mb-2" />

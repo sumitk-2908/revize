@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   ArrowLeft, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
   Share2, Link as LinkIcon, Check, Maximize,
@@ -60,12 +60,26 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   const rowVirtualizer = useVirtualizer({
     count: numPages,
     getScrollElement: () => containerRef.current,
-    estimateSize: () => (containerWidth * 0.95 * 1.414) + 16, // A4 aspect ratio + margin
+    // First guess only — each page reports its real height through
+    // measureElement once rendered. `scale` belongs here because react-pdf
+    // renders a page at width * scale, so zooming changes every row's height.
+    estimateSize: () => (containerWidth * 0.95 * scale * 1.414) + 16, // A4 aspect ratio + margin
     overscan: 2,
   });
 
   const virtualItems = rowVirtualizer.getVirtualItems();
-  const currentPage = virtualItems.length > 0 ? virtualItems[0].index + 1 : 1;
+
+  // The page sitting at the top of the viewport.
+  //
+  // This used to read `virtualItems[0].index`, but getVirtualItems() includes
+  // the `overscan` rows rendered *above* the visible range — so on any page past
+  // the second, currentPage read up to 2 pages behind where the user actually
+  // was. Next then scrolled to a page already behind them (looking like it went
+  // backwards) and Prev appeared to do nothing. Resolving the offset directly
+  // asks the virtualizer which row is genuinely at the scroll position.
+  const currentPage = numPages > 0
+    ? Math.min((rowVirtualizer.getVirtualItemForOffset(rowVirtualizer.scrollOffset ?? 0)?.index ?? 0) + 1, numPages)
+    : 1;
 
   // Zoom applies to the two rendered formats; text reflows and Office files
   // have no preview at all.
@@ -164,10 +178,21 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     setNumPages(numPages);
   }
 
-  function changePage(offset: number) {
-    const newPage = Math.min(Math.max(currentPage + offset, 1), numPages);
-    rowVirtualizer.scrollToIndex(newPage - 1, { align: 'start' });
-  }
+  // Page heights are cached per index once measured. Zooming or resizing changes
+  // every one of them, so the cache has to be dropped or scrollToIndex keeps
+  // aiming at stale offsets and lands on the wrong page.
+  useEffect(() => {
+    if (numPages > 0) rowVirtualizer.measure();
+  }, [scale, containerWidth, numPages, rowVirtualizer]);
+
+  const goToPage = useCallback((page: number) => {
+    if (numPages === 0) return;
+    rowVirtualizer.scrollToIndex(Math.min(Math.max(page, 1), numPages) - 1, { align: 'start' });
+  }, [numPages, rowVirtualizer]);
+
+  const changePage = useCallback((offset: number) => {
+    goToPage(currentPage + offset);
+  }, [currentPage, goToPage]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -188,7 +213,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentPage, numPages, router, isPdf, canZoom]);
+  }, [changePage, router, isPdf, canZoom]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -385,12 +410,17 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
               {virtualItems.map((virtualRow) => (
                 <div
                   key={virtualRow.index}
+                  /* measureElement reads data-index and reports the row's real
+                     height back, so scrollToIndex works on PDFs whose pages
+                     aren't A4 and at zoom levels the estimate can't predict.
+                     No fixed height here on purpose — that's what gets measured. */
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
                   style={{
                     position: 'absolute',
                     top: 0,
                     left: 0,
                     width: '100%',
-                    height: `${virtualRow.size}px`,
                     transform: `translateY(${virtualRow.start}px)`,
                     display: 'flex',
                     justifyContent: 'center',

@@ -92,6 +92,43 @@ export const getFullStudyHistory = async (userId?: string) => {
   }
 };
 
+export type StudyActivityDay = { activity_date: string; interaction_count: number };
+
+/**
+ * Days the student actually studied, for the profile heatmap.
+ *
+ * Deliberately not derived from `study_history`: that table is UNIQUE on
+ * (user_id, document_id) and written with an upsert that overwrites
+ * `accessed_at`, so it holds one row per document stamped with the most recent
+ * visit. Reading two documents across four days produced two dates, which is
+ * why the heatmap used to contradict the streak counter. `study_activity` keeps
+ * one row per day and is written by the same RPC that maintains the streak.
+ */
+export const getStudyActivityCalendar = async (
+  userId?: string,
+  year?: number,
+): Promise<StudyActivityDay[]> => {
+  if (!userId) return [];
+
+  // UTC to match `activity_date`, which the RPC stamps with the UTC date.
+  const target = year ?? new Date().getUTCFullYear();
+
+  const { data, error } = await supabase
+    .from('study_activity')
+    .select('activity_date, interaction_count')
+    .eq('user_id', userId)
+    .gte('activity_date', `${target}-01-01`)
+    .lte('activity_date', `${target}-12-31`)
+    .order('activity_date', { ascending: true });
+
+  if (error) {
+    console.error("Fetch Study Activity Error:", error);
+    return [];
+  }
+
+  return data || [];
+};
+
 export const logStudySession = async (userId: string, documentId: number) => {
   try {
     const { error } = await supabase.from('study_history').upsert({
