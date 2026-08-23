@@ -33,6 +33,12 @@ Do not commit `.env`, `.env.*`, `*.env`, service-role keys, private signing keys
 | `REFRESH_TOKEN_EXPIRE_DAYS` | Optional | Refresh-token setting; defaults to `30` |
 | `CORS_ORIGINS` | Optional | Allowed frontend origins; the checked-in default includes localhost and detected Vercel URLs |
 | `SENTRY_DSN` | Optional | FastAPI Sentry DSN |
+| `GROQ_API_KEY` | Optional | Groq API key for AI document summaries and study sets. With this unset, `app.llm` returns `None` and every AI feature is simply absent — no other code path changes |
+| `LLM_FALLBACK_API_KEY` | Optional | API key for a second, OpenAI-compatible provider, tried only when Groq returns 429 or 5xx. Groq's free tier allows 200K tokens/day for the whole organisation, so exhausting it is routine rather than exceptional |
+| `LLM_FALLBACK_BASE_URL` | Optional | Base URL of the fallback provider's OpenAI-compatible API, e.g. `https://api.cerebras.ai/v1`. Required for the fallback to activate — a key alone is ignored, since only Groq's URL is built in |
+| `LLM_FALLBACK_MODEL` | Optional | Model ID at the fallback provider. Defaults to the same ID requested from Groq, which is usually wrong across providers — set it explicitly |
+| `LLM_MODEL_FAST` | Optional | Model for summaries and key points; defaults to `openai/gpt-oss-20b` |
+| `LLM_MODEL_STRONG` | Optional | Model for flashcards and quizzes; defaults to `openai/gpt-oss-120b`. Both defaults support Groq's strict structured outputs — check that before substituting another model |
 | `R2_ACCOUNT_ID` | Upload/delete required | Cloudflare account ID used to construct the R2 S3 endpoint |
 | `R2_ACCESS_KEY_ID` | Upload/delete required | R2 API access key |
 | `R2_SECRET_ACCESS_KEY` | Upload/delete required | R2 API secret |

@@ -8,7 +8,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 # Import the optimized documents router
-from app.routers import documents, users
+from app.routers import ai_content, documents, users
 from app.config import settings
 import sentry_sdk
 from app.db import supabase
@@ -49,14 +49,19 @@ origins=settings.CORS_ORIGINS
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, 
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    # PUT is here for the AI-content draft endpoint; every other write is POST or PATCH.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
 # Mount the routers
 app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
+# Shares the documents prefix but stays a separate module to keep documents.py
+# from growing further. Included *after* it so FastAPI still resolves the
+# existing /bulk-status and /{document_id}/status routes first.
+app.include_router(ai_content.router, prefix="/api/v1/documents", tags=["AI Content"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 
 @app.get("/health", tags=["Health"])

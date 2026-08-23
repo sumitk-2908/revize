@@ -11,6 +11,7 @@ import { requestUploadPrompt } from "@/app/lib/student-prompts";
 import { DocumentGridSkeleton, InlineSpinner } from "@/components/layout/SharedLayouts";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import SubjectCardDesigner from "@/components/subject/SubjectCardDesigner";
+import AiContentPanel from "@/components/subject/AiContentPanel";
 import { DocumentWithAnalytics, FlaggedDocument } from "@/app/lib/document-types";
 import { documentHref } from "@/components/layout/utils";
 import { useNotifications } from "@/app/context/NotificationsContext";
@@ -406,16 +407,17 @@ function AdminInboxAuditingContent() {
                   )}
                 </div>
 
-                <div className="mt-auto flex gap-2 border-t border-border pt-4">
+                <div className="mt-auto flex flex-wrap gap-2 border-t border-border pt-4">
                   <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="motion-hover motion-active flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary py-2 text-sm font-bold text-primary-foreground hover:opacity-90">
                     <Eye size={12} /> View
                   </a>
                   <button onClick={() => handleApprove(doc.id)} className="motion-hover motion-active flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-success py-2 text-sm font-bold text-white hover:opacity-90">
                     <CheckCircle size={12} /> Apprv
                   </button>
-                  <button onClick={() => handleRejectClick(doc.id)} className="motion-hover motion-active flex items-center justify-center rounded-xl border border-destructive/30 p-2 text-destructive hover:bg-destructive/10">
+                  <button onClick={() => handleRejectClick(doc.id)} aria-label={`Reject ${doc.title}`} className="motion-hover motion-active flex items-center justify-center rounded-xl border border-destructive/30 p-2 text-destructive hover:bg-destructive/10">
                     <Trash2 size={14} />
                   </button>
+                  <AiContentPanel documentId={doc.id} title={doc.title} />
                 </div>
               </article>
             );
@@ -435,10 +437,11 @@ function AdminInboxAuditingContent() {
               <h3 className="mt-3 line-clamp-2 min-h-[2rem] text-base font-bold tracking-tight text-foreground">{doc.title}</h3>
               <p className="mt-2 text-sm font-semibold text-muted">{doc.subject} • {doc.category}</p>
 
-              <div className="mt-auto flex gap-2 border-t border-border pt-4">
+              <div className="mt-auto flex flex-wrap gap-2 border-t border-border pt-4">
                 <button onClick={() => setReviewingFlagsDoc(doc)} className="motion-hover motion-active flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-destructive/10 py-2 text-sm font-bold text-destructive hover:bg-destructive/20">
                   <MessageSquareWarning size={12} /> Review Flags
                 </button>
+                <AiContentPanel documentId={doc.id} title={doc.title} />
               </div>
             </article>
           ))}

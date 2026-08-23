@@ -17,9 +17,10 @@ def reset_rate_limits():
     test is asserting — a failure that depends on test ordering.
     """
     from app.main import limiter as app_limiter
+    from app.routers.ai_content import limiter as ai_content_limiter
     from app.routers.documents import limiter as documents_limiter
 
-    for limiter in (app_limiter, documents_limiter):
+    for limiter in (app_limiter, documents_limiter, ai_content_limiter):
         reset = getattr(limiter._storage, "reset", None)
         if callable(reset):
             reset()

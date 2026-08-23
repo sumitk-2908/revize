@@ -20,6 +20,40 @@ import fitz
 MB = 1024 * 1024
 MAX_EXTRACTED_TEXT_CHARS = 500_000
 
+# A PDF that yields less than this after stripping whitespace has no usable
+# text layer — a scan, or slides exported as images — and is worth OCR'ing.
+# Set above zero because such files often still carry a stray page label.
+_MIN_PDF_TEXT_LAYER_CHARS = 50
+
+# Render resolution for OCR. 150 is the low end of what Tesseract reads
+# reliably; higher costs render time and memory for little accuracy gain.
+_OCR_DPI = 150
+
+# Tesseract's `eng` model cannot read cursive handwriting — it returns
+# confident-looking nonsense ("PMS bbb ob b6beoe") rather than nothing, which
+# would fill the search index with tokens nobody can ever match and make the
+# row look processed. Mean per-word confidence separates the two cleanly:
+# measured on this portal's own scans, printed pages score 85-93 and
+# handwritten ones 29-44, so anything under this is discarded as noise.
+_MIN_OCR_CONFIDENCE = 60.0
+
+# Inline OCR runs while an upload request is open, so it has to stay short.
+# Measured in a 0.5-CPU / 512MB container (a Render Starter instance's shape)
+# a dense A4 page costs ~5.3s, so four pages is ~21s of worst-case OCR on top
+# of the read, thumbnail and R2 upload the request already pays for. The limit
+# is deliberately low because that half-CPU is shared: two uploads landing
+# together roughly double each other's OCR time, so a cap that looks fine
+# alone can stack into a gateway timeout. Four still covers the scans this
+# portal actually receives — syllabi, notices and question papers run one to
+# three pages.
+#
+# Longer documents are skipped outright rather than truncated at four pages.
+# Truncating would leave content_text populated, and the backfill selects on
+# blank content, so pages past the limit would never be indexed by anything.
+# Skipping keeps the row on the backfill's work list, where OCR runs with no
+# request waiting on it — pass max_ocr_pages=None there to lift the limit.
+_MAX_INLINE_OCR_PAGES = 4
+
 
 @dataclass(frozen=True)
 class FileSpec:
@@ -157,18 +191,132 @@ def _verify_text(data: bytes) -> None:
         raise ValueError("Text files must be UTF-8 encoded.")
 
 
-def extract_text(spec: FileSpec, data: bytes, max_chars: int = MAX_EXTRACTED_TEXT_CHARS) -> str | None:
-    """Extract searchable text for formats with reliable plain-text support.
+def _ocr_page(image) -> tuple[str, Optional[float]]:
+    """OCRs one rendered page into (text, mean word confidence).
 
-    Office documents and images are intentionally skipped in v1. PDF extraction
-    returns an empty string for image-only/scanned files, while the character
-    cap keeps unusually large documents from bloating a database row.
+    Uses ``image_to_data`` rather than ``image_to_string`` — it is the same
+    single Tesseract pass, but it also reports per-word confidence, which is
+    what lets a printed page be told apart from an unreadable handwritten one.
+    Confidence is None when the page holds no words at all.
+
+    Imports are deferred so the module still loads on a host without the OCR
+    stack; the ImportError then surfaces only on this fallback path.
+    """
+    import pytesseract
+
+    data = pytesseract.image_to_data(image, lang="eng", output_type=pytesseract.Output.DICT)
+
+    lines: dict[tuple, list[str]] = {}
+    confidences: list[float] = []
+    for index, word in enumerate(data["text"]):
+        if not str(word).strip():
+            continue
+        confidence = float(data["conf"][index])
+        if confidence >= 0:  # Tesseract marks non-word regions with -1
+            confidences.append(confidence)
+        line = (data["block_num"][index], data["par_num"][index], data["line_num"][index])
+        lines.setdefault(line, []).append(word)
+
+    text = "\n".join(" ".join(words) for words in lines.values())
+    return text, (sum(confidences) / len(confidences) if confidences else None)
+
+
+def _ocr_pdf(document: fitz.Document, spec: FileSpec, max_chars: int) -> str:
+    """Renders and OCRs each page of an open PDF, skipping unreadable ones."""
+    from PIL import Image
+
+    pages: list[str] = []
+    unreadable = 0
+    remaining = max_chars
+    for page in document:
+        pix = page.get_pixmap(dpi=_OCR_DPI)
+        image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        text, confidence = _ocr_page(image)
+        if confidence is None:
+            continue  # genuinely blank page, not a failed read
+        if confidence < _MIN_OCR_CONFIDENCE:
+            unreadable += 1
+            continue
+        pages.append(text)
+        remaining -= len(text) + 1  # +1 for the joining newline
+        if remaining <= 0:
+            break  # the cap would discard the rest anyway — don't pay to OCR it
+
+    if unreadable:
+        print(
+            f"Warning: discarded {unreadable} unreadable OCR page(s) in .{spec.ext} "
+            f"- confidence below {_MIN_OCR_CONFIDENCE:.0f}, likely handwriting"
+        )
+    return "\n".join(pages)
+
+
+def _ocr_image(data: bytes, spec: FileSpec) -> Optional[str]:
+    """OCRs an uploaded image, or None when the read is too poor to index."""
+    from PIL import Image
+
+    with Image.open(io.BytesIO(data)) as opened:
+        # Palette GIFs and RGBA PNGs both read better once flattened to RGB.
+        text, confidence = _ocr_page(opened.convert("RGB"))
+
+    if confidence is not None and confidence < _MIN_OCR_CONFIDENCE:
+        print(
+            f"Warning: discarded unreadable OCR output for .{spec.ext} "
+            f"- confidence {confidence:.0f} below {_MIN_OCR_CONFIDENCE:.0f}, likely handwriting"
+        )
+        return None
+    return text
+
+
+def extract_text(
+    spec: FileSpec,
+    data: bytes,
+    max_chars: int = MAX_EXTRACTED_TEXT_CHARS,
+    max_ocr_pages: Optional[int] = _MAX_INLINE_OCR_PAGES,
+) -> str | None:
+    """Extract searchable text, falling back to OCR for scanned pages and images.
+
+    A PDF with a real text layer is read straight out of it; one without (a
+    scanned handout) is rendered page-by-page and OCR'd, and images always go
+    through OCR. Office documents are still skipped.
+
+    OCR output is only kept when Tesseract read it confidently — handwriting
+    yields plausible-looking nonsense that would pollute the search index, so
+    low-confidence pages are dropped rather than stored.
+
+    ``max_ocr_pages`` bounds how long a request can be held hostage by OCR: a
+    PDF with more pages than that is left for the offline backfill, which calls
+    this with None to lift the limit. Images are a single page and ignore it.
+
+    OCR is best-effort: a missing Tesseract binary, an uninstalled Pillow, or a
+    render failure logs a warning and degrades to the pre-OCR result — ``""``
+    for a scanned PDF, ``None`` for an image, so a later run can retry the
+    image once the binary is in place. The character cap keeps unusually large
+    documents from bloating a database row.
     """
     if spec.kind == "text":
         text = data.decode("utf-8")
     elif spec.kind == "pdf":
         with fitz.open(stream=data, filetype="pdf") as document:
             text = "\n".join(page.get_text("text") for page in document)
+            if len(text.strip()) < _MIN_PDF_TEXT_LAYER_CHARS:
+                if max_ocr_pages is not None and document.page_count > max_ocr_pages:
+                    print(
+                        f"Note: skipping inline OCR for a {document.page_count}-page .{spec.ext} "
+                        f"(limit {max_ocr_pages}); the backfill job will index it"
+                    )
+                else:
+                    try:
+                        text = _ocr_pdf(document, spec, max_chars) or text
+                    except Exception as error:
+                        print(f"Warning: OCR failed for .{spec.ext}: {error}")
+    elif spec.kind == "image":
+        try:
+            text = _ocr_image(data, spec)
+        except Exception as error:
+            print(f"Warning: OCR failed for .{spec.ext}: {error}")
+            return None
+        if text is None:
+            return None
     else:
         return None
 

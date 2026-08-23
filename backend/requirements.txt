@@ -23,4 +23,13 @@ email-validator>=2.0.0
 # PDF Processing
 PyMuPDF>=1.23.0
 
+# OCR fallback so scanned PDFs and image uploads are still full-text searchable.
+# Needs the Tesseract binary on the host, which pip cannot supply:
+#   Debian/Ubuntu: apt-get install tesseract-ocr
+#   macOS:         brew install tesseract
+# Without it the OCR branch logs a warning and the file is stored without
+# searchable content rather than failing the upload.
+pytesseract>=0.3.10
+Pillow>=10.0.0
+
 boto3==1.34.*

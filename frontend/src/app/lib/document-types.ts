@@ -8,10 +8,12 @@ export type DocumentRecord = Pick<
 > &
   Partial<Omit<DatabaseDocument, "id" | "title" | "category" | "subject" | "file_url">>;
 export type DocumentAnalytics = Database["public"]["Tables"]["document_analytics"]["Row"];
+export type DocumentAiContent = Database["public"]["Tables"]["document_ai_content"]["Row"];
 
 export type DocumentWithAnalytics = DocumentRecord & {
   last_page?: number | null;
   document_analytics?: Partial<DocumentAnalytics> | Partial<DocumentAnalytics>[] | null;
+  document_ai_content?: DocumentAiContent[];
 };
 
 export type FlaggedDocument = DatabaseDocument & {

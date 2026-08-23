@@ -1,0 +1,11 @@
+# Secrets must never be baked into the image — Render injects environment
+# variables at runtime, and a copied .env would also outrank them locally.
+.env
+.env.*
+*.env
+
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+tests/

@@ -10,7 +10,8 @@ export type AuthPromptFeature =
   | "studyStreak"
   | "profile"
   | "comment"
-  | "resourceRequest";
+  | "resourceRequest"
+  | "studySets";
 
 export type AuthPromptCopy = {
   title: string;
@@ -57,6 +58,10 @@ export const AUTH_PROMPT_COPY: Record<AuthPromptFeature, AuthPromptCopy> = {
   resourceRequest: {
     title: "Request a resource",
     description: "Sign in to ask for the notes you need and upvote what other students are missing.",
+  },
+  studySets: {
+    title: "Study with flashcards and quizzes",
+    description: "Sign in to review curated flashcards and test yourself with quizzes for this document.",
   },
 };
 

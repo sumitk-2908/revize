@@ -5,6 +5,8 @@ import { supabase } from "@/app/lib/api/core";
 import { subjectSlug as slugifySubject, documentPath, isModulelessDocument } from "@/components/layout/utils";
 import Breadcrumb from "@/components/ui/Breadcrumb";
 import { CommentSection } from "@/components/comments/CommentSection";
+import { Sparkles } from "lucide-react";
+import DocumentStudyPanel from "@/components/subject/DocumentStudyPanel";
 // Standard import of the wrapper component
 import PDFViewerWrapper from "@/components/pdf/PDFViewerWrapper";
 
@@ -20,7 +22,8 @@ import PDFViewerWrapper from "@/components/pdf/PDFViewerWrapper";
  * `documentPath` considers canonical, so old `/module-1/` links keep working.
  */
 
-const DOCUMENT_SELECT = "*, document_analytics(upvotes, view_count, download_count)";
+const DOCUMENT_SELECT =
+  "*, document_analytics(upvotes, view_count, download_count), document_ai_content(kind, payload, version, status)";
 
 /** The module a URL segment addresses, or null when the URL carries no module. */
 const moduleNumberOf = (moduleSlug: string | null) => {
@@ -153,6 +156,18 @@ export default async function DocumentView({
     redirect(canonicalPath);
   }
 
+  const summaryContent = documentMeta.document_ai_content?.find(
+    (content) => content.kind === "summary" && content.status === "published",
+  );
+  const summaryPayload =
+    summaryContent?.payload && typeof summaryContent.payload === "object" && !Array.isArray(summaryContent.payload)
+      ? summaryContent.payload as { summary?: unknown; key_points?: unknown }
+      : null;
+  const summaryText = typeof summaryPayload?.summary === "string" ? summaryPayload.summary : "";
+  const keyPoints = Array.isArray(summaryPayload?.key_points)
+    ? summaryPayload.key_points.filter((point): point is string => typeof point === "string")
+    : [];
+
   // Use the wrapper to render the client logic
   return (
     <div className="mx-auto flex max-w-[90rem] flex-col space-y-4">
@@ -161,6 +176,21 @@ export default async function DocumentView({
         <div className="w-full min-w-0">
           <PDFViewerWrapper documentMeta={documentMeta} />
         </div>
+        {summaryContent && (summaryText || keyPoints.length > 0) && (
+          <section className="w-full rounded-2xl border border-primary/20 bg-primary/5 p-5 sm:p-6" aria-labelledby="document-summary-heading">
+            <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-primary uppercase">
+              <Sparkles size={15} aria-hidden="true" />
+              <h2 id="document-summary-heading">AI Summary</h2>
+            </div>
+            {summaryText && <p className="mt-3 text-sm leading-6 whitespace-pre-wrap text-foreground">{summaryText}</p>}
+            {keyPoints.length > 0 && (
+              <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-6 text-muted">
+                {keyPoints.map((point, index) => <li key={`${point}-${index}`}>{point}</li>)}
+              </ul>
+            )}
+          </section>
+        )}
+        <DocumentStudyPanel documentId={documentMeta.id} />
         <div className="w-full shrink-0">
           <CommentSection documentId={documentMeta.id} />
         </div>

@@ -21,6 +21,25 @@ class Settings(BaseSettings):
     ]
     SENTRY_DSN: str | None = None
 
+    # LLM provider keys for AI summaries and study sets. Both are optional: with
+    # neither set, app.llm returns None and every AI feature is simply absent.
+    #
+    # The fallback exists because Groq's free tier allows 200K tokens/day for the
+    # whole organisation, so a busy afternoon of approvals genuinely exhausts it
+    # and a 429 is routine rather than exceptional. Any OpenAI-compatible
+    # /chat/completions endpoint works as the fallback (Gemini, Cerebras,
+    # Mistral, OpenRouter); it needs a base URL because only Groq's is hardcoded.
+    GROQ_API_KEY: str | None = None
+    LLM_FALLBACK_API_KEY: str | None = None
+    LLM_FALLBACK_BASE_URL: str | None = None
+    LLM_FALLBACK_MODEL: str | None = None
+
+    # Summaries are short and easy, so they run on the smaller model; flashcards
+    # and quizzes need real comprehension. Both support Groq's strict structured
+    # outputs (constrained decoding), which qwen and the compound systems do not.
+    LLM_MODEL_FAST: str = "openai/gpt-oss-20b"
+    LLM_MODEL_STRONG: str = "openai/gpt-oss-120b"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @field_validator("CORS_ORIGINS", mode="before")
