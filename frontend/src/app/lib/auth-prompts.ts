@@ -60,8 +60,8 @@ export const AUTH_PROMPT_COPY: Record<AuthPromptFeature, AuthPromptCopy> = {
     description: "Sign in to ask for the notes you need and upvote what other students are missing.",
   },
   studySets: {
-    title: "Study with flashcards and quizzes",
-    description: "Sign in to review curated flashcards and test yourself with quizzes for this document.",
+    title: "Generate flashcards and quizzes",
+    description: "Sign in to generate flashcards and a practice quiz from this document.",
   },
 };
 

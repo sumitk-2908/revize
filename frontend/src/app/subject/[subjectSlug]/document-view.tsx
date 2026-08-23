@@ -5,8 +5,7 @@ import { supabase } from "@/app/lib/api/core";
 import { subjectSlug as slugifySubject, documentPath, isModulelessDocument } from "@/components/layout/utils";
 import Breadcrumb from "@/components/ui/Breadcrumb";
 import { CommentSection } from "@/components/comments/CommentSection";
-import { Sparkles } from "lucide-react";
-import DocumentStudyPanel from "@/components/subject/DocumentStudyPanel";
+import AiStudyTools from "@/components/subject/AiStudyTools";
 // Standard import of the wrapper component
 import PDFViewerWrapper from "@/components/pdf/PDFViewerWrapper";
 
@@ -167,6 +166,13 @@ export default async function DocumentView({
   const keyPoints = Array.isArray(summaryPayload?.key_points)
     ? summaryPayload.key_points.filter((point): point is string => typeof point === "string")
     : [];
+  // Handed to AiStudyTools rather than rendered here, so the text still arrives
+  // in the server-rendered HTML (and stays indexable) while the student reveals
+  // it with the Generate button.
+  const summary =
+    summaryContent && (summaryText || keyPoints.length > 0)
+      ? { text: summaryText, keyPoints }
+      : null;
 
   // Use the wrapper to render the client logic
   return (
@@ -176,21 +182,7 @@ export default async function DocumentView({
         <div className="w-full min-w-0">
           <PDFViewerWrapper documentMeta={documentMeta} />
         </div>
-        {summaryContent && (summaryText || keyPoints.length > 0) && (
-          <section className="w-full rounded-2xl border border-primary/20 bg-primary/5 p-5 sm:p-6" aria-labelledby="document-summary-heading">
-            <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-primary uppercase">
-              <Sparkles size={15} aria-hidden="true" />
-              <h2 id="document-summary-heading">AI Summary</h2>
-            </div>
-            {summaryText && <p className="mt-3 text-sm leading-6 whitespace-pre-wrap text-foreground">{summaryText}</p>}
-            {keyPoints.length > 0 && (
-              <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-6 text-muted">
-                {keyPoints.map((point, index) => <li key={`${point}-${index}`}>{point}</li>)}
-              </ul>
-            )}
-          </section>
-        )}
-        <DocumentStudyPanel documentId={documentMeta.id} />
+        <AiStudyTools documentId={documentMeta.id} summary={summary} />
         <div className="w-full shrink-0">
           <CommentSection documentId={documentMeta.id} />
         </div>

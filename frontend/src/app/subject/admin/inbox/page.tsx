@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/api/core";
 import { updateDocumentStatus, getFlaggedDocuments, dismissDocumentFlags, bulkUpdateDocumentStatus } from "@/app/lib/api/moderation";
 import { deleteDocument } from "@/app/lib/api/documents";
-import { Inbox, CheckCircle, Trash2, Eye, FileText, ArrowLeft, X, Flag, ShieldAlert, MessageSquareWarning, Upload, Search, Palette } from "lucide-react";
+import { Inbox, CheckCircle, Trash2, Eye, FileText, ArrowLeft, X, Flag, ShieldAlert, MessageSquareWarning, Upload, Search, Palette, Bot } from "lucide-react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { requestUploadPrompt } from "@/app/lib/student-prompts";
@@ -16,7 +16,14 @@ import { DocumentWithAnalytics, FlaggedDocument } from "@/app/lib/document-types
 import { documentHref } from "@/components/layout/utils";
 import { useNotifications } from "@/app/context/NotificationsContext";
 
-/** Per-tab hero styling. A lookup rather than nested ternaries, now that there are three tabs. */
+/** The three artifacts AiContentPanel curates, for the per-card coverage chips. */
+const AI_KINDS = [
+  { kind: 'summary', label: 'Summary' },
+  { kind: 'flashcards', label: 'Cards' },
+  { kind: 'quiz', label: 'Quiz' },
+] as const;
+
+/** Per-tab hero styling. A lookup rather than nested ternaries, now that there are four tabs. */
 const TAB_HERO = {
   pending: {
     shell: 'border-warning/20 bg-warning/5',
@@ -25,6 +32,14 @@ const TAB_HERO = {
     icon: Inbox,
     title: 'Admin Moderation Hub',
     blurb: 'Audit crowdsourced assets before deployment.',
+  },
+  approved: {
+    shell: 'border-primary/20 bg-primary/5',
+    chip: 'bg-primary',
+    text: 'text-primary',
+    icon: Bot,
+    title: 'AI Study Content',
+    blurb: 'Add summaries, flashcards, and quizzes to already-published documents.',
   },
   flagged: {
     shell: 'border-destructive/20 bg-destructive/5',
@@ -45,9 +60,14 @@ const TAB_HERO = {
 } as const;
 
 function AdminInboxAuditingContent() {
-  const [activeTab, setActiveTab] = useState<'pending' | 'flagged' | 'design'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'flagged' | 'design'>('pending');
 
   const [pendingDocs, setPendingDocs] = useState<DocumentWithAnalytics[]>([]);
+  const [approvedDocs, setApprovedDocs] = useState<DocumentWithAnalytics[]>([]);
+  /** Which AI artifacts are already live, per document id, for the coverage chips. */
+  const [publishedKinds, setPublishedKinds] = useState<Record<number, string[]>>({});
+  const [approvedTotalPages, setApprovedTotalPages] = useState(1);
+  const [approvedTotalCount, setApprovedTotalCount] = useState(0);
   const [flaggedDocs, setFlaggedDocs] = useState<FlaggedDocument[]>([]);
   const [approvedDuplicateMatches, setApprovedDuplicateMatches] = useState<Record<number, DocumentWithAnalytics>>({});
   const [loading, setLoading] = useState(true);
@@ -142,6 +162,62 @@ function AdminInboxAuditingContent() {
     setLoading(false);
   };
 
+  /**
+   * The approved corpus, so AI study content can be curated *after* approval.
+   * The pending tab drops a document the moment it is approved, and AiContentPanel
+   * used to be mounted only there — which left no path to the bulk of the library.
+   */
+  const loadApproved = async () => {
+    setLoading(true);
+
+    let query = supabase
+      .from('documents')
+      .select('*', { count: 'exact' })
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false });
+
+    if (appliedSubjectQuery) {
+      // Escape LIKE wildcards so a typed % or _ matches literally.
+      const escaped = appliedSubjectQuery.replace(/[%_\\]/g, (c) => `\\${c}`);
+      query = query.ilike('subject', `%${escaped}%`);
+    }
+
+    const pageSize = 20;
+    const from = (page - 1) * pageSize;
+    query = query.range(from, from + pageSize - 1);
+
+    const { data: approved, count } = await query;
+    setApprovedDocs(approved || []);
+    if (count !== null) {
+      setApprovedTotalPages(Math.ceil(count / pageSize));
+      setApprovedTotalCount(count);
+    }
+
+    // One follow-up read for just this page's documents, so the admin can see
+    // what is already live without opening every dialog. Only *published* rows
+    // come back: the two SELECT policies hide drafts from the browser client,
+    // which is why draft state stays behind AiContentPanel's service-role read.
+    const ids = (approved || []).map((doc) => doc.id);
+    if (ids.length > 0) {
+      const { data: content } = await supabase
+        .from('document_ai_content')
+        .select('document_id, kind')
+        .in('document_id', ids)
+        .eq('status', 'published');
+
+      setPublishedKinds(
+        (content || []).reduce<Record<number, string[]>>((result, row) => {
+          result[row.document_id] = [...(result[row.document_id] || []), row.kind];
+          return result;
+        }, {})
+      );
+    } else {
+      setPublishedKinds({});
+    }
+
+    setLoading(false);
+  };
+
   // Debounce typing so the inbox query runs on a settled search term, not per keystroke.
   useEffect(() => {
     const trimmed = subjectQuery.trim();
@@ -156,6 +232,13 @@ function AdminInboxAuditingContent() {
   useEffect(() => {
     loadInbox();
   }, [page, appliedSubjectQuery]);
+
+  // The approved tab shares the search box and pager, so it reloads on the same
+  // inputs — but only while it is the tab actually on screen.
+  useEffect(() => {
+    if (activeTab !== 'approved') return;
+    loadApproved();
+  }, [activeTab, page, appliedSubjectQuery]);
 
   useEffect(() => {
     const channel = supabase
@@ -276,6 +359,9 @@ function AdminInboxAuditingContent() {
 
   const hero = TAB_HERO[activeTab];
   const HeroIcon = hero.icon;
+  // Pending and approved share the pager but count separately.
+  const isPaged = activeTab === 'pending' || activeTab === 'approved';
+  const visibleTotalPages = activeTab === 'approved' ? approvedTotalPages : totalPages;
 
   return (
     <main className="animate-fade-up mx-auto w-full max-w-6xl space-y-6 pb-12">
@@ -315,6 +401,12 @@ function AdminInboxAuditingContent() {
             Pending Audits ({activeTab === 'pending' ? pendingTotalCount : pendingDocs.length})
           </button>
           <button
+            onClick={() => { setActiveTab('approved'); setPage(1); }}
+            className={`motion-hover motion-active flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${activeTab === 'approved' ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-primary/10 hover:text-primary'}`}
+          >
+            <Bot size={16} /> Approved{activeTab === 'approved' ? ` (${approvedTotalCount})` : ''}
+          </button>
+          <button
             onClick={() => setActiveTab('flagged')}
             className={`motion-hover motion-active flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${activeTab === 'flagged' ? 'bg-destructive text-destructive-foreground' : 'text-muted hover:bg-destructive/10 hover:text-destructive'}`}
           >
@@ -328,13 +420,13 @@ function AdminInboxAuditingContent() {
           </button>
         </div>
 
-        {activeTab === 'pending' && (
+        {isPaged && (
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
             <input
               type="text"
               inputMode="search"
-              aria-label="Search pending audits by subject"
+              aria-label={activeTab === 'approved' ? "Search approved documents by subject" : "Search pending audits by subject"}
               placeholder="Search subjects..."
               value={subjectQuery}
               onChange={(e) => setSubjectQuery(e.target.value)}
@@ -423,6 +515,41 @@ function AdminInboxAuditingContent() {
             );
           })}
 
+          {/* APPROVED TAB RENDER — curate AI study content after approval */}
+          {activeTab === 'approved' && approvedDocs.map(doc => {
+            const live = publishedKinds[doc.id] || [];
+            return (
+              <article key={doc.id} className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <FileText size={16} />
+                  </div>
+                  <span className="rounded-full bg-success/10 px-2.5 py-1 text-xs font-extrabold tracking-wider text-success uppercase">Approved</span>
+                </div>
+                <h3 className="mt-3 line-clamp-2 min-h-[2rem] text-base font-bold tracking-tight text-foreground">{doc.title}</h3>
+                <p className="mt-2 text-sm font-semibold text-muted">{doc.subject} • Module {doc.module_id || 1}</p>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {AI_KINDS.map(({ kind, label }) => (
+                    <span
+                      key={kind}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${live.includes(kind) ? 'bg-success/10 text-success' : 'bg-surface-hover text-muted'}`}
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="mt-auto flex flex-wrap gap-2 border-t border-border pt-4">
+                  <Link href={documentHref(doc)} className="motion-hover motion-active flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-surface-hover py-2 text-sm font-bold text-foreground hover:opacity-80">
+                    <Eye size={12} /> View
+                  </Link>
+                  <AiContentPanel documentId={doc.id} title={doc.title} />
+                </div>
+              </article>
+            );
+          })}
+
           {/* FLAGGED TAB RENDER */}
           {activeTab === 'flagged' && flaggedDocs.map(doc => (
             <article key={doc.id} className="flex flex-col rounded-2xl border border-destructive/20 bg-surface p-4 shadow-sm">
@@ -456,6 +583,12 @@ function AdminInboxAuditingContent() {
               </button>
             </div>
           )}
+          {activeTab === 'approved' && approvedDocs.length === 0 && (
+            <div className="col-span-full rounded-2xl border border-dashed border-border bg-surface-hover/50 p-8 text-center">
+              <h2 className="text-lg font-extrabold tracking-tight text-foreground">No approved documents match</h2>
+              <p className="mx-auto mt-1 max-w-md text-sm leading-6 font-medium text-muted">Clear the subject filter, or approve a submission from the Pending Audits tab first.</p>
+            </div>
+          )}
           {activeTab === 'flagged' && flaggedDocs.length === 0 && (
             <div className="col-span-full rounded-2xl border border-dashed border-border bg-surface-hover/50 p-8 text-center">
               <h2 className="text-lg font-extrabold tracking-tight text-foreground">Flag review is clear</h2>
@@ -469,7 +602,7 @@ function AdminInboxAuditingContent() {
       )}
 
       {/* PAGINATION */}
-      {activeTab === 'pending' && totalPages > 1 && (
+      {isPaged && visibleTotalPages > 1 && (
         <div className="mt-8 flex items-center justify-center gap-2">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -478,10 +611,10 @@ function AdminInboxAuditingContent() {
           >
             Previous
           </button>
-          <span className="text-sm font-semibold text-muted">Page {page} of {totalPages}</span>
+          <span className="text-sm font-semibold text-muted">Page {page} of {visibleTotalPages}</span>
           <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
+            onClick={() => setPage(p => Math.min(visibleTotalPages, p + 1))}
+            disabled={page === visibleTotalPages}
             className="rounded-xl border border-border px-4 py-2 text-sm font-bold text-foreground hover:bg-surface-hover disabled:opacity-50"
           >
             Next
