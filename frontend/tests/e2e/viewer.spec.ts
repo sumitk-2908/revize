@@ -30,7 +30,8 @@ test.describe('PDF Viewer Flow', () => {
         await expect(page.getByText(/page 2/i)).toBeVisible();
       }
 
-      // PDF-only in-viewer search is available once the document is open.
+      // PDF-only in-viewer search opens from the search toolbar button.
+      await page.getByRole('button', { name: 'Open document search' }).click();
       const searchInput = page.getByRole('textbox', { name: 'Search document text' });
       await expect(searchInput).toBeVisible();
       await searchInput.fill('the');
@@ -46,7 +47,6 @@ test.describe('PDF Viewer Flow', () => {
       await expect(page.getByRole('navigation', { name: 'Document breadcrumb' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Toggle minimap' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Toggle document outline' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Split view (coming soon)' })).toBeDisabled();
       await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
 
       await page.keyboard.press('?');
