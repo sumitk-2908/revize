@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useState, useRef } from "react";
 import { trackDocumentStat } from "@/app/lib/api/analytics";
 import { buildDownloadHref } from "@/app/lib/file-types";
+import { ensureDownloadAuth } from "@/app/lib/auth-prompts";
 
 interface TrendingCarouselProps {
   documents: DocumentWithAnalytics[];
@@ -21,6 +22,7 @@ export function TrendingCarousel({ documents }: TrendingCarouselProps) {
   const handleDownload = async (e: React.MouseEvent, doc: any) => {
     e.preventDefault();
 
+    if (!(await ensureDownloadAuth())) return;
     if (downloadingRef.current.has(doc.id)) return;
     downloadingRef.current.add(doc.id);
     setDownloadingIds((prev) => [...prev, doc.id]);

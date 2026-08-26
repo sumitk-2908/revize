@@ -9,7 +9,7 @@ import { Bookmark, Download, Eye, FileText, NotebookPen, FileQuestion, ListCheck
 import Link from "next/link";
 import { manageOfflineFile } from "../lib/offline-manager";
 import { buildDownloadHref } from "@/app/lib/file-types";
-import { requestAuthPrompt } from "../lib/auth-prompts";
+import { ensureDownloadAuth, requestAuthPrompt } from "../lib/auth-prompts";
 import { requestUploadPrompt, shouldShowContributionPrompt, dismissContributionPrompt } from "../lib/student-prompts";
 import { BookmarksSkeleton, InlineSpinner } from "@/components/layout/SharedLayouts";
 import type { DocumentRecord, DocumentWithAnalytics } from "@/app/lib/document-types";
@@ -31,7 +31,7 @@ function BookmarksContent() {
         setIsSignedOut(true);
       }
     });
-    
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUserId(session.user.id);
@@ -41,7 +41,7 @@ function BookmarksContent() {
         setIsSignedOut(true);
       }
     });
-    
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -62,17 +62,18 @@ function BookmarksContent() {
     if (!userId) return;
     const doc = documents.find((d: DocumentRecord) => d.id === id);
     if (!doc) return;
-    
+
     if (doc.file_url) {
       manageOfflineFile(doc.file_url, 'REMOVE_PDF').catch(console.error);
     }
-    
+
     toggleBookmarkMutation.mutate({ userId, documentId: id, isAdding: false, doc });
   };
 
   const handleDownload = async (e: React.MouseEvent, doc: DocumentRecord | DocumentWithAnalytics) => {
     e.preventDefault();
-    
+
+    if (!(await ensureDownloadAuth())) return;
     if (downloadingRef.current.has(doc.id)) return;
     downloadingRef.current.add(doc.id);
     setDownloadingIds((prev) => [...prev, doc.id]);

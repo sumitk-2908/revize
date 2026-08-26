@@ -36,6 +36,22 @@ const RADIX_ANIMATE_UTILITIES = [
 /** Embla carousel's own class API, not Tailwind. */
 const VENDOR_UTILITIES = ["embla(__.*)?"];
 
+/**
+ * The study panel's 3D flip, collapse and tab-panel primitives.
+ *
+ * Written as plain rules in globals.css rather than as Tailwind utilities because
+ * they are driven by `data-` attributes Radix sets, and the `@layer utilities`
+ * block those would have to live in is not variant-composable in Tailwind v4.
+ */
+const STUDY_PANEL_UTILITIES = [
+  "study-flip",
+  "study-flip-inner",
+  "study-flip-face",
+  "study-flip-back",
+  "study-collapse",
+  "study-panel",
+];
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -53,7 +69,7 @@ const eslintConfig = defineConfig([
       // Passing it under `settings.tailwindcss` (as this config used to) is silently ignored.
       "tailwindcss/no-custom-classname": [
         "error",
-        { whitelist: [...PROJECT_UTILITIES, ...RADIX_ANIMATE_UTILITIES, ...VENDOR_UTILITIES] },
+        { whitelist: [...PROJECT_UTILITIES, ...RADIX_ANIMATE_UTILITIES, ...VENDOR_UTILITIES, ...STUDY_PANEL_UTILITIES] },
       ],
       "tailwindcss/no-contradicting-classname": "error",
       // Arbitrary values are a first-class Tailwind feature and this codebase uses them

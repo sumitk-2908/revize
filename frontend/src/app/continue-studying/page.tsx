@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/api/core";
 import { trackDocumentStat, getTrendingDocuments } from "../lib/api/analytics";
 import { getSuggestedNextSteps } from "../lib/api/profile";
-import { requestAuthPrompt } from "../lib/auth-prompts";
+import { ensureDownloadAuth, requestAuthPrompt } from "../lib/auth-prompts";
 import { recordStudentDownload, requestUploadPrompt, shouldShowContributionPrompt, dismissContributionPrompt } from "../lib/student-prompts";
 import { Clock, Sparkles, NotebookPen, FileQuestion, ListChecks, BookOpen } from "lucide-react";
 import Link from "next/link";
@@ -160,6 +160,7 @@ function ContinueStudyingContent() {
 
   const handleDownload = async (e: React.MouseEvent, doc: any) => {
     e.preventDefault();
+    if (!(await ensureDownloadAuth())) return;
     if (downloadingRef.current.has(doc.id)) return;
     downloadingRef.current.add(doc.id);
     setDownloadingIds((prev) => [...prev, doc.id]);

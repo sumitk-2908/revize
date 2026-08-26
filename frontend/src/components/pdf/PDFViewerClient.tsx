@@ -22,6 +22,7 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import { InlineSpinner, SkeletonBlock } from "@/components/layout/SharedLayouts";
 import { dispatchToast as showToast } from "@/app/lib/toast";
 import { buildDownloadHref, getExtension, getFileKind, getFileLabel } from "@/app/lib/file-types";
+import { ensureDownloadAuth } from "@/app/lib/auth-prompts";
 import { usePdfTextSearch } from "./usePdfTextSearch";
 
 // Configure PDF.js worker
@@ -449,13 +450,18 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     window.open(`https://api.whatsapp.com/send?text=${text}${url}`, "_blank");
   };
 
+  const handleOpenFile = (e: React.MouseEvent) => {
+    // Opening the raw storage URL is public and must never be treated as a download.
+    if (!canZoom) return;
+    e.preventDefault();
+    window.open(documentMeta.file_url, "_blank", "noopener,noreferrer");
+  };
+
   const handleDownloadClick = async (e: React.MouseEvent) => {
     e.preventDefault();
+    if (!(await ensureDownloadAuth())) return;
     if (isDownloading.current) return;
 
-    // Read the href now: React nulls `currentTarget` once the handler returns,
-    // and everything below this line is async. Lets one handler serve both the
-    // "FullScreen" link (raw file) and the "Download" button (?download= href).
     const targetUrl = (e.currentTarget as HTMLAnchorElement).href || documentMeta.file_url;
     isDownloading.current = true;
 
@@ -533,7 +539,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   };
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] w-full flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
+    <div className="flex h-[calc(100vh-6rem)] w-full flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
 
       {/* 1. Header: w-full ensures it takes full width for flex distributions */}
       <div className="flex min-h-[3.5rem] w-full shrink-0 flex-col justify-between gap-3 border-b border-border bg-surface-hover p-3 sm:flex-row sm:items-center sm:gap-4 sm:px-4 sm:py-2">
@@ -586,7 +592,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
 
-          <a href={documentMeta.file_url} target="_blank" rel="noopener noreferrer" onClick={handleDownloadClick} className="motion-hover motion-active flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-primary hover:bg-primary/10 sm:px-3">
+          <a href={documentMeta.file_url} target="_blank" rel="noopener noreferrer" onClick={handleOpenFile} className="motion-hover motion-active flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-primary hover:bg-primary/10 sm:px-3">
             <span className="hidden sm:inline">{canZoom ? "FullScreen" : "Open"}</span> <Maximize size={14} />
           </a>
         </div>
@@ -787,7 +793,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
       <Dialog.Root open={isFlagModalOpen} onOpenChange={setIsFlagModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="motion-modal data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm" />
-          <Dialog.Content className="animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 motion-modal fixed top-[50%] left-[50%] z-[100] w-full max-w-md translate-[-50%] overflow-hidden rounded-2xl border border-border bg-surface shadow-xl">
+          <Dialog.Content className="animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 motion-modal fixed top-[50%] left-[50%] z-[100] w-[calc(100%-2rem)] max-w-2xl translate-[-50%] overflow-hidden rounded-2xl border border-border bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-border p-4">
               <Dialog.Title className="flex items-center gap-2 text-xl font-bold tracking-tight text-foreground">
                 <Flag size={16} className="text-destructive" aria-hidden="true" /> Report Issue

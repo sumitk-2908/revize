@@ -1,5 +1,7 @@
 "use client";
 
+import { supabase } from "@/app/lib/api/core";
+
 export type AuthPromptFeature =
   | "bookmark"
   | "sidebarBookmark"
@@ -11,7 +13,8 @@ export type AuthPromptFeature =
   | "profile"
   | "comment"
   | "resourceRequest"
-  | "studySets";
+  | "studySets"
+  | "download";
 
 export type AuthPromptCopy = {
   title: string;
@@ -63,6 +66,17 @@ export const AUTH_PROMPT_COPY: Record<AuthPromptFeature, AuthPromptCopy> = {
     title: "Generate flashcards and quizzes",
     description: "Sign in to generate flashcards and a practice quiz from this document.",
   },
+  download: {
+    title: "Download this document",
+    description: "Sign in to download a copy of this resource. You can keep viewing and streaming it without an account.",
+  },
+};
+
+export const ensureDownloadAuth = async () => {
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (sessionData.session?.user) return true;
+  requestAuthPrompt("download");
+  return false;
 };
 
 export const requestAuthPrompt = (feature: AuthPromptFeature) => {

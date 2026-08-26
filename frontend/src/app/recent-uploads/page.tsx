@@ -7,7 +7,7 @@ import { supabase } from "../lib/api/core";
 import { Upload, Eye, Download, FileText, NotebookPen, FileQuestion, ListChecks, Bookmark, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { getUploadPromptCopy, recordStudentDownload, requestUploadPrompt, shouldShowContributionPrompt, dismissContributionPrompt } from "../lib/student-prompts";
-import { requestAuthPrompt } from "../lib/auth-prompts";
+import { ensureDownloadAuth, requestAuthPrompt } from "../lib/auth-prompts";
 import { manageOfflineFile } from "../lib/offline-manager";
 import { buildDownloadHref } from "@/app/lib/file-types";
 import { DocumentGridSkeleton, InlineSpinner } from "@/components/layout/SharedLayouts";
@@ -69,6 +69,7 @@ function RecentUploadsContent() {
   const handleDownload = async (e: React.MouseEvent, doc: any) => {
     e.preventDefault();
 
+    if (!(await ensureDownloadAuth())) return;
     if (downloadingRef.current.has(doc.id)) return;
     downloadingRef.current.add(doc.id);
     setDownloadingIds((prev) => [...prev, doc.id]);

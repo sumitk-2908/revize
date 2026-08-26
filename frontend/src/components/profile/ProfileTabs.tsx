@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Eye, Download, BookOpen, Clock, Sparkles, Upload, Settings, Trash2, ClipboardList, Plus } from "lucide-react";
 import Link from "next/link";
-import { 
-  trackDocumentStat, 
-  getTrendingDocuments   
+import {
+  trackDocumentStat,
+  getTrendingDocuments
 } from "@/app/lib/api/analytics";
 import { triggerStreakUpdate, getSuggestedNextSteps, deleteUserAccount } from "@/app/lib/api/profile";
 import { supabase } from "@/app/lib/api/core";
@@ -19,6 +19,7 @@ import { recordStudentDownload, requestUploadPrompt, requestUploadPromptFor, sho
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { DocumentWithAnalytics } from "@/app/lib/document-types";
 import { buildDownloadHref } from "@/app/lib/file-types";
+import { ensureDownloadAuth } from "@/app/lib/auth-prompts";
 import { Tables } from "@/app/lib/database.types";
 import { User } from "@supabase/supabase-js";
 import { useLogStudySessionMutation } from "@/app/hooks/useStudyHistory";
@@ -51,7 +52,7 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
   const downloadingRef = useRef<Set<number>>(new Set());
   const logStudySessionMutation = useLogStudySessionMutation();
   const queryClient = useQueryClient();
-  
+
   const tabs = [
     { id: "overview", label: "Overview" },
     { id: "library", label: "My Library" },
@@ -77,7 +78,7 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
     if (!window.confirm(`Delete the request "${request.title}"? This cannot be undone.`)) return;
     deleteRequest.mutate(request.id);
   };
-   
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -127,7 +128,8 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
 
   const handleDownload = async (e: React.MouseEvent, doc: any) => {
     e.preventDefault();
-    
+
+    if (!(await ensureDownloadAuth())) return;
     if (downloadingRef.current.has(doc.id)) return;
     downloadingRef.current.add(doc.id);
 
@@ -154,11 +156,10 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`motion-hover rounded-xl px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-colors ${
-              activeTab === tab.id
-                ? "bg-primary/10 text-primary"
-                : "text-muted hover:bg-surface-hover hover:text-foreground"
-            }`}
+            className={`motion-hover rounded-xl px-4 py-2.5 text-sm font-bold whitespace-nowrap transition-colors ${activeTab === tab.id
+              ? "bg-primary/10 text-primary"
+              : "text-muted hover:bg-surface-hover hover:text-foreground"
+              }`}
           >
             {tab.label}
           </button>
@@ -172,13 +173,13 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
               <ActivityHeatmap history={history} activity={studyActivity} />
             </ErrorBoundary>
           )}
-          
+
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold tracking-[0.06em] text-muted uppercase">Continue Studying</h3>
               <Link href="/continue-studying" className="motion-hover text-sm font-bold text-primary hover:opacity-80">View All</Link>
             </div>
-            
+
             {history.length > 0 ? history.slice(0, 3).map((item: any, idx: number) => (
               <div key={idx} className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-3 shadow-sm">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -205,11 +206,11 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
               </div>
             )) : (
               <div className="rounded-2xl border border-dashed border-border bg-surface-hover/50 py-8 text-center">
-                 <h3 className="text-base font-extrabold tracking-tight text-foreground">Start studying from your dashboard</h3>
-                 <p className="mx-auto mt-1 max-w-md text-sm leading-6 font-medium text-muted">Open a resource and your recent study activity will appear here.</p>
-                 <Link href="/recent-uploads" className="motion-hover motion-active mt-4 inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:opacity-90">
-                   Start Studying
-                 </Link>
+                <h3 className="text-base font-extrabold tracking-tight text-foreground">Start studying from your dashboard</h3>
+                <p className="mx-auto mt-1 max-w-md text-sm leading-6 font-medium text-muted">Open a resource and your recent study activity will appear here.</p>
+                <Link href="/recent-uploads" className="motion-hover motion-active mt-4 inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:opacity-90">
+                  Start Studying
+                </Link>
               </div>
             )}
 
@@ -244,7 +245,7 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
                     {history.length === 0 ? "Trending Right Now" : "Suggested Next Steps"}
                   </h3>
                 </div>
-                
+
                 {suggestions.map((item: any, idx: number) => (
                   <div key={`sugg-${idx}`} className="motion-hover flex items-center gap-4 rounded-2xl border border-warning/20 bg-warning/5 p-3 shadow-sm hover:border-warning">
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning/10 text-warning">
@@ -271,39 +272,39 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
 
       {activeTab === "library" && (
         <div className="animate-fade-up space-y-4">
-           {bookmarks.length > 0 ? bookmarks.map((item: any, idx: number) => (
-             <div key={idx} className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-3 shadow-sm">
-               <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning/10 text-warning"><BookOpen size={18} /></div>
-               <div className="min-w-0 flex-1">
-                 <p className="truncate text-sm font-bold text-foreground">{item.title}</p>
-                 <p className="truncate text-xs text-muted capitalize">{item.subject}</p>
-               </div>
-               
-               <div className="flex shrink-0 items-center gap-2">
-                 <Link
-                   href={documentHref(item)}
-                   onClick={() => handleViewDocument(item.id)}
-                   className="motion-hover motion-active flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground uppercase hover:opacity-90"
-                 >
-                   <Eye size={12} /> View
-                 </Link>
-                 <button 
-                   onClick={(e) => handleDownload(e, item)} 
-                   className="motion-hover motion-active flex items-center gap-1.5 rounded-lg border border-border bg-surface-hover px-3 py-1.5 text-xs font-bold text-foreground uppercase hover:opacity-80"
-                 >
-                   <Download size={12} />
-                 </button>
-               </div>
-             </div>
-           )) : (
-             <div className="rounded-2xl border border-dashed border-warning/30 bg-warning/5 p-8 text-center">
-               <h3 className="text-base font-extrabold tracking-tight text-foreground">Build your study library</h3>
-               <p className="mx-auto mt-1 max-w-md text-sm leading-6 font-medium text-muted">Bookmark resources you want to revisit before exams.</p>
-               <Link href="/recent-uploads" className="motion-hover motion-active mt-4 inline-flex rounded-xl bg-warning px-4 py-2 text-sm font-bold text-white hover:opacity-90">
-                 Bookmark Resources
-               </Link>
-             </div>
-           )}
+          {bookmarks.length > 0 ? bookmarks.map((item: any, idx: number) => (
+            <div key={idx} className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-3 shadow-sm">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning/10 text-warning"><BookOpen size={18} /></div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-foreground">{item.title}</p>
+                <p className="truncate text-xs text-muted capitalize">{item.subject}</p>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                <Link
+                  href={documentHref(item)}
+                  onClick={() => handleViewDocument(item.id)}
+                  className="motion-hover motion-active flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground uppercase hover:opacity-90"
+                >
+                  <Eye size={12} /> View
+                </Link>
+                <button
+                  onClick={(e) => handleDownload(e, item)}
+                  className="motion-hover motion-active flex items-center gap-1.5 rounded-lg border border-border bg-surface-hover px-3 py-1.5 text-xs font-bold text-foreground uppercase hover:opacity-80"
+                >
+                  <Download size={12} />
+                </button>
+              </div>
+            </div>
+          )) : (
+            <div className="rounded-2xl border border-dashed border-warning/30 bg-warning/5 p-8 text-center">
+              <h3 className="text-base font-extrabold tracking-tight text-foreground">Build your study library</h3>
+              <p className="mx-auto mt-1 max-w-md text-sm leading-6 font-medium text-muted">Bookmark resources you want to revisit before exams.</p>
+              <Link href="/recent-uploads" className="motion-hover motion-active mt-4 inline-flex rounded-xl bg-warning px-4 py-2 text-sm font-bold text-white hover:opacity-90">
+                Bookmark Resources
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
@@ -311,33 +312,33 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
         <div className="animate-fade-up space-y-4">
           <div className="mb-6 grid grid-cols-2 gap-4">
             <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-               <div className="mb-1 text-xs font-bold tracking-[0.06em] text-muted uppercase">Total Uploads</div>
-               <div className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums">{uploads.length}</div>
+              <div className="mb-1 text-xs font-bold tracking-[0.06em] text-muted uppercase">Total Uploads</div>
+              <div className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums">{uploads.length}</div>
             </div>
             <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-               <div className="mb-1 text-xs font-bold tracking-[0.06em] text-muted uppercase">Total Impact</div>
-               <div className="text-3xl font-extrabold tracking-tight text-success tabular-nums">
-                 {uploads.reduce((acc: number, u: any) => acc + (u.document_analytics?.download_count || 0), 0)} DLs
-               </div>
+              <div className="mb-1 text-xs font-bold tracking-[0.06em] text-muted uppercase">Total Impact</div>
+              <div className="text-3xl font-extrabold tracking-tight text-success tabular-nums">
+                {uploads.reduce((acc: number, u: any) => acc + (u.document_analytics?.download_count || 0), 0)} DLs
+              </div>
             </div>
           </div>
 
           <h3 className="text-xs font-bold tracking-[0.06em] text-muted uppercase">Upload History</h3>
           {uploads.length > 0 ? uploads.map((item: any, idx: number) => (
-             <UserDocumentCard 
-               key={idx} 
-               item={item} 
-               onRefresh={() => queryClient.invalidateQueries()} 
-             />
-           )) : (
-             <div className="rounded-2xl border border-dashed border-success/30 bg-success/5 p-8 text-center">
-               <h3 className="text-base font-extrabold tracking-tight text-foreground">Share the notes you wish you had earlier</h3>
-               <p className="mx-auto mt-1 max-w-md text-sm leading-6 font-medium text-muted">Upload notes, PYQs, or syllabus PDFs so the next student has a better starting point.</p>
-               <button onClick={requestUploadPrompt} className="motion-hover motion-active mt-4 inline-flex items-center gap-2 rounded-xl bg-success px-4 py-2 text-sm font-bold text-white hover:opacity-90">
-                 <Upload size={15} /> Upload Notes
-               </button>
-             </div>
-           )}
+            <UserDocumentCard
+              key={idx}
+              item={item}
+              onRefresh={() => queryClient.invalidateQueries()}
+            />
+          )) : (
+            <div className="rounded-2xl border border-dashed border-success/30 bg-success/5 p-8 text-center">
+              <h3 className="text-base font-extrabold tracking-tight text-foreground">Share the notes you wish you had earlier</h3>
+              <p className="mx-auto mt-1 max-w-md text-sm leading-6 font-medium text-muted">Upload notes, PYQs, or syllabus PDFs so the next student has a better starting point.</p>
+              <button onClick={requestUploadPrompt} className="motion-hover motion-active mt-4 inline-flex items-center gap-2 rounded-xl bg-success px-4 py-2 text-sm font-bold text-white hover:opacity-90">
+                <Upload size={15} /> Upload Notes
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -404,18 +405,18 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
       )}
 
       {activeTab === "achievements" && (
-         <div className="animate-fade-up">
-           <ErrorBoundary title="Achievements could not load" message="The achievements list hit an unexpected problem.">
-             <AchievementsList achievements={achievements} />
-           </ErrorBoundary>
+        <div className="animate-fade-up">
+          <ErrorBoundary title="Achievements could not load" message="The achievements list hit an unexpected problem.">
+            <AchievementsList achievements={achievements} />
+          </ErrorBoundary>
         </div>
       )}
 
       {activeTab === "activity" && (
         <div className="animate-fade-up">
-           <ErrorBoundary title="Timeline could not load" message="The activity timeline hit an unexpected problem.">
-             <ActivityTimeline history={history} bookmarks={bookmarks} uploads={uploads} />
-           </ErrorBoundary>
+          <ErrorBoundary title="Timeline could not load" message="The activity timeline hit an unexpected problem.">
+            <ActivityTimeline history={history} bookmarks={bookmarks} uploads={uploads} />
+          </ErrorBoundary>
         </div>
       )}
 
@@ -431,8 +432,8 @@ export default function ProfileTabs({ user, history, studyActivity = [], bookmar
                 <p className="mt-1 text-sm leading-6 font-medium text-muted">
                   Permanently delete your account and all associated data. This action cannot be undone.
                 </p>
-                
-                <button 
+
+                <button
                   onClick={async () => {
                     if (window.confirm("Are you absolutely sure you want to delete your account? This action is permanent and cannot be undone.")) {
                       try {

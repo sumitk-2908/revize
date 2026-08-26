@@ -75,8 +75,8 @@ export default function DocumentCard({
     <button
       onClick={(e) => { e.preventDefault(); onToggleBookmark(doc.id); }}
       className={`motion-hover motion-active absolute top-2 right-2 rounded-lg border p-1.5 shadow-sm backdrop-blur-md ${isBookmarked
-          ? "border-warning bg-warning text-white"
-          : "border-border/60 bg-background/70 text-warning hover:bg-warning/10"
+        ? "border-warning bg-warning text-white"
+        : "border-border/60 bg-background/70 text-warning hover:bg-warning/10"
         }`}
       aria-label={isBookmarked ? "Remove bookmark" : "Bookmark resource"}
     >
@@ -86,10 +86,10 @@ export default function DocumentCard({
 
   return (
     <article className={`group flex flex-col rounded-2xl border border-l-[3px] ${accentBorderColor} motion-hover p-5 shadow-sm hover:-translate-y-1 hover:shadow-md ${isSuggestion
-        ? "border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40 hover:border-y-amber-500/40 dark:hover:border-indigo-500"
-        : isBookmarked
-          ? "border-warning/20 bg-warning/5 hover:border-warning/40 hover:border-y-warning/40"
-          : "border-border bg-surface hover:border-y-border hover:border-r-border"
+      ? "border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40 hover:border-y-amber-500/40 dark:hover:border-indigo-500"
+      : isBookmarked
+        ? "border-warning/20 bg-warning/5 hover:border-warning/40 hover:border-y-warning/40"
+        : "border-border bg-surface hover:border-y-border hover:border-r-border"
       }`}>
 
       {isSuggestion && badgeText && (
@@ -159,14 +159,15 @@ export default function DocumentCard({
         )}
       </div>
 
-      {/* Bottom action row: DL · View · Upvote */}
+      {/* Bottom action row: Download · View · Upvote */}
       <div className="mt-4 flex gap-2 border-t border-border pt-4">
         <button
           aria-label={isDownloading ? `Downloading ${doc.title}` : `Download ${doc.title}`}
+          title={isDownloading ? "Downloading" : "Download"}
           onClick={(e) => onDownload(e, doc)}
-          className="motion-hover motion-active inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-hover py-2 text-sm font-bold text-foreground hover:border-primary/50"
+          className="motion-hover motion-active inline-flex items-center justify-center rounded-xl border border-border bg-surface-hover p-2 text-sm font-bold text-foreground hover:border-primary/50"
         >
-          {isDownloading ? <InlineSpinner label="Downloading" size={13} /> : <Download size={13} aria-hidden="true" />} DL
+          {isDownloading ? <InlineSpinner label="Downloading" size={13} /> : <Download size={15} aria-hidden="true" />}
         </button>
 
         <Link

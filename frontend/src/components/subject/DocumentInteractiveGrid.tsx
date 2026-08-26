@@ -8,7 +8,7 @@ import { deleteDocument, getPaginatedDocumentsByModule } from "@/app/lib/api/doc
 import { supabase } from "@/app/lib/api/core";
 import { manageOfflineFile } from "@/app/lib/offline-manager";
 import { buildDownloadFilename } from "@/app/lib/file-types";
-import { requestAuthPrompt } from "@/app/lib/auth-prompts";
+import { ensureDownloadAuth, requestAuthPrompt } from "@/app/lib/auth-prompts";
 import { getUploadPromptCopy, recordStudentDownload, requestUploadPrompt, shouldShowContributionPrompt, dismissContributionPrompt } from "@/app/lib/student-prompts";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import { useInfiniteQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
@@ -28,13 +28,13 @@ export interface PaginationConfig {
   subjectName?: string;
 }
 
-export default function DocumentInteractiveGrid({ 
-  initialDocuments, 
-  subjectSlug, 
+export default function DocumentInteractiveGrid({
+  initialDocuments,
+  subjectSlug,
   loading = false,
-  paginationConfig 
-}: { 
-  initialDocuments: DocumentWithAnalytics[]; 
+  paginationConfig
+}: {
+  initialDocuments: DocumentWithAnalytics[];
   subjectSlug: string;
   loading?: boolean;
   paginationConfig?: PaginationConfig;
@@ -104,15 +104,15 @@ export default function DocumentInteractiveGrid({
   }, []);
 
   const rowCount = Math.ceil(displayDocuments.length / cols);
-  
+
   const virtualizer = useWindowVirtualizer({
     count: hasNextPage ? rowCount + 1 : rowCount,
-    estimateSize: () => 380, 
-    overscan: 2, 
+    estimateSize: () => 380,
+    overscan: 2,
   });
 
   const virtualItems = virtualizer.getVirtualItems();
-  
+
   useEffect(() => {
     const lastItem = virtualItems[virtualItems.length - 1];
     if (!lastItem) return;
@@ -135,7 +135,7 @@ export default function DocumentInteractiveGrid({
     } else {
       if (targetDoc?.file_url) manageOfflineFile(targetDoc.file_url, 'CACHE_PDF').catch(console.error);
     }
-    
+
     toggleBookmarkMutation.mutate({ userId, documentId: id, isAdding: !isBookmarked, doc: targetDoc });
   };
 
@@ -175,7 +175,7 @@ export default function DocumentInteractiveGrid({
         ...prev,
         [id]: isUpvoted ? Math.max(0, currentCount - 1) : currentCount + 1
       }));
-      
+
       if (paginationConfig) {
         queryClient.setQueryData<InfiniteDocumentsData>(paginationConfig.queryKey, (oldData) => {
           if (!oldData) return oldData;
@@ -231,6 +231,7 @@ export default function DocumentInteractiveGrid({
 
   const handleDownload = async (e: React.MouseEvent, doc: DocumentWithAnalytics) => {
     e.preventDefault();
+    if (!(await ensureDownloadAuth())) return;
     if (downloadingIds.includes(doc.id)) return;
     setDownloadingIds((prev) => [...prev, doc.id]);
     trackDocumentStat(doc.id, 'download');
@@ -262,7 +263,7 @@ export default function DocumentInteractiveGrid({
     if (!documentToDelete) return;
     await deleteDocument(documentToDelete);
     setDeletedIds((prev) => [...prev, documentToDelete]);
-    
+
     if (paginationConfig) {
       queryClient.setQueryData<InfiniteDocumentsData>(paginationConfig.queryKey, (oldData) => {
         if (!oldData) return oldData;
@@ -353,53 +354,53 @@ export default function DocumentInteractiveGrid({
           {virtualizer.getVirtualItems().map((virtualRow) => {
             const isLoaderRow = virtualRow.index > rowCount - 1;
 
-          return (
-            <div
-              key={virtualRow.key}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: `${virtualRow.size}px`,
-                transform: `translateY(${virtualRow.start}px)`,
-                display: 'grid',
-                gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                gap: '1.5rem',
-                paddingBottom: '1.5rem'
-              }}
-            >
-              {isLoaderRow ? (
-                 <CenteredSpinner />
-              ) : (
-                Array.from({ length: cols }).map((_, colIndex) => {
-                  const itemIndex = virtualRow.index * cols + colIndex;
-                  const doc = displayDocuments[itemIndex];
-                  
-                  if (!doc) return <div key={`empty-${colIndex}`} />;
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                  gap: '1.5rem',
+                  paddingBottom: '1.5rem'
+                }}
+              >
+                {isLoaderRow ? (
+                  <CenteredSpinner />
+                ) : (
+                  Array.from({ length: cols }).map((_, colIndex) => {
+                    const itemIndex = virtualRow.index * cols + colIndex;
+                    const doc = displayDocuments[itemIndex];
 
-                  return (
-                    <DocumentCard
-                      key={doc.id}
-                      doc={doc}
-                      subjectSlug={subjectSlug}
-                      isBookmarked={bookmarks.includes(doc.id)}
-                      isUpvoted={upvotes.includes(doc.id)}
-                      currentUpvoteCount={upvoteCounts[doc.id]}
-                      isAdmin={isAdmin}
-                      onDownload={handleDownload}
-                      onToggleBookmark={toggleBookmark}
-                      onToggleUpvote={handleToggleUpvote}
-                      onDelete={setDocumentToDelete}
-                      isDownloading={downloadingIds.includes(doc.id)}
-                    />
-                  );
-                })
-              )}
-            </div>
-          );
-        })}
-      </div>
+                    if (!doc) return <div key={`empty-${colIndex}`} />;
+
+                    return (
+                      <DocumentCard
+                        key={doc.id}
+                        doc={doc}
+                        subjectSlug={subjectSlug}
+                        isBookmarked={bookmarks.includes(doc.id)}
+                        isUpvoted={upvotes.includes(doc.id)}
+                        currentUpvoteCount={upvoteCounts[doc.id]}
+                        isAdmin={isAdmin}
+                        onDownload={handleDownload}
+                        onToggleBookmark={toggleBookmark}
+                        onToggleUpvote={handleToggleUpvote}
+                        onDelete={setDocumentToDelete}
+                        isDownloading={downloadingIds.includes(doc.id)}
+                      />
+                    );
+                  })
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       <AlertDialog.Root open={documentToDelete !== null} onOpenChange={(open) => !open && setDocumentToDelete(null)}>
