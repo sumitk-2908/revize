@@ -2,8 +2,26 @@ import { unstable_cache } from 'next/cache';
 import { createPublicClient } from '@/utils/supabase/public';
 import { SUBJECT_SELECT, type Branch, type Subject, type Module } from './subjects';
 
+/**
+ * CI deliberately supplies a non-resolvable Supabase URL. Avoid making a
+ * network request during prerendering when the public catalogue is unavailable.
+ */
+function hasUsableSupabaseConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  return Boolean(
+    url &&
+    key &&
+    !url.includes('ci-placeholder') &&
+    !key.includes('ci-placeholder')
+  );
+}
+
 export const getCachedSubjects = unstable_cache(
   async () => {
+    if (!hasUsableSupabaseConfig()) return [];
+
     const supabase = createPublicClient();
     const { data, error } = await supabase.from('subjects').select(SUBJECT_SELECT).order('name');
     if (error) throw error;
@@ -15,6 +33,8 @@ export const getCachedSubjects = unstable_cache(
 
 export const getCachedBranches = unstable_cache(
   async () => {
+    if (!hasUsableSupabaseConfig()) return [];
+
     const supabase = createPublicClient();
     const { data, error } = await supabase.from('branches').select('*').order('code');
     if (error) throw error;
@@ -26,6 +46,8 @@ export const getCachedBranches = unstable_cache(
 
 export const getCachedSubjectBySlug = unstable_cache(
   async (slug: string) => {
+    if (!hasUsableSupabaseConfig()) return null;
+
     const supabase = createPublicClient();
     const { data, error } = await supabase.from('subjects').select(SUBJECT_SELECT).eq('slug', slug).maybeSingle();
     if (error) throw error;
@@ -37,6 +59,8 @@ export const getCachedSubjectBySlug = unstable_cache(
 
 export const getCachedModules = unstable_cache(
   async (subjectId: number) => {
+    if (!hasUsableSupabaseConfig()) return [];
+
     const supabase = createPublicClient();
     const { data, error } = await supabase.from('modules').select('*').eq('subject_id', subjectId).order('module_number');
     if (error) throw error;
@@ -48,10 +72,12 @@ export const getCachedModules = unstable_cache(
 
 export const getCachedSubjectCounts = unstable_cache(
   async () => {
+    if (!hasUsableSupabaseConfig()) return {};
+
     const supabase = createPublicClient();
     const { data: countData, error } = await supabase.rpc("get_subject_counts");
     if (error) throw error;
-    
+
     const counts: Record<string, number> = {};
     if (countData) {
       countData.forEach((row: any) => {
@@ -68,6 +94,8 @@ export const getCachedSubjectCounts = unstable_cache(
 
 export const getCachedModuleCounts = unstable_cache(
   async (subjectName: string) => {
+    if (!hasUsableSupabaseConfig()) return {};
+
     const supabase = createPublicClient();
     const { data: countData, error } = await supabase.rpc('get_module_counts', { p_subject: subjectName });
     if (error) throw error;
