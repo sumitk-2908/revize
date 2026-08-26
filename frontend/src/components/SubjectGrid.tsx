@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { ScrollReveal } from "@/components/ui/Motion";
 import { Subject, Branch, subjectMatchesFilter } from "@/app/lib/api/subjects";
 import { ACADEMIC_YEARS, getYearLabel } from "@/app/lib/subject-config";
 import { resolveSubjectDesign, spanClass } from "@/app/lib/subject-design";
 import SubjectCard from "@/components/subject/SubjectCard";
 import { CardGrid, EmptyState } from "@/components/layout/SharedLayouts";
-import { BookOpen, Upload, Filter, ChevronDown, Search, X } from "lucide-react";
+import { BookOpen, Upload, Filter, X } from "lucide-react";
 import { requestUploadPrompt } from "@/app/lib/student-prompts";
 
 interface SubjectGridProps {
@@ -19,7 +19,6 @@ interface SubjectGridProps {
 }
 
 export default function SubjectGrid({ subjects, subjectCounts, branches, defaultBranchId = null, defaultYear = null }: SubjectGridProps) {
-  const [subjectQuery, setSubjectQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const elementsRef = useRef<(HTMLElement | null)[]>([]);
 
@@ -30,14 +29,7 @@ export default function SubjectGrid({ subjects, subjectCounts, branches, default
   const branchId = branchOverride ? branchOverride.value : defaultBranchId;
   const year = yearOverride ? yearOverride.value : defaultYear;
 
-  const search = subjectQuery.trim().toLowerCase();
-  const filteredSubjects = subjects
-    .filter(sub => subjectMatchesFilter(sub, branchId, year))
-    .filter(sub => !search || sub.name.toLowerCase().includes(search));
-
-  const branchName = branches.find(b => b.id === branchId)?.code;
-  const isFiltered = branchId !== null || year !== null;
-  const filterSummary = [branchName, getYearLabel(year)].filter(Boolean).join(" · ");
+  const filteredSubjects = subjects.filter(sub => subjectMatchesFilter(sub, branchId, year));
 
   const clearFilters = () => {
     setBranchOverride({ value: null });
@@ -47,7 +39,7 @@ export default function SubjectGrid({ subjects, subjectCounts, branches, default
   useEffect(() => {
     setActiveIndex(0);
     elementsRef.current = elementsRef.current.slice(0, filteredSubjects.length);
-  }, [subjectQuery, branchId, year, filteredSubjects.length]);
+  }, [branchId, year, filteredSubjects.length]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>, index: number) => {
     const totalItems = filteredSubjects.length;
@@ -60,101 +52,62 @@ export default function SubjectGrid({ subjects, subjectCounts, branches, default
     if (newIndex !== index) { setActiveIndex(newIndex); elementsRef.current[newIndex]?.focus(); }
   };
 
-  const controlClass = "motion-hover motion-focus h-11 w-full rounded-xl border border-border/60 bg-surface px-10 text-sm font-semibold text-foreground shadow-sm outline-none transition-colors hover:border-border focus:border-primary focus:ring-1 focus:ring-primary/20";
-  const selectClass = `${controlClass} cursor-pointer appearance-none`;
-  const searchClass = `${controlClass} placeholder:font-medium placeholder:text-muted`;
 
   return (
     <>
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            inputMode="search"
-            aria-label="Search subjects"
-            placeholder="Search subjects..."
-            value={subjectQuery}
-            onChange={(e) => setSubjectQuery(e.target.value)}
-            className={searchClass}
-          />
-          {subjectQuery && (
-            <button
-              type="button"
-              onClick={() => setSubjectQuery("")}
-              aria-label="Clear subject search"
-              className="motion-hover absolute inset-y-0 right-3 flex items-center text-muted hover:text-foreground"
-            >
-              <X className="size-4" />
-            </button>
-          )}
-        </div>
-
-        {branches.length > 0 && (
-          <div className="relative w-full sm:w-52">
-            <Filter className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <select
-              aria-label="Filter subjects by branch"
-              value={branchId ?? ""}
-              onChange={(e) => setBranchOverride({ value: e.target.value ? Number(e.target.value) : null })}
-              className={selectClass}
-            >
-              <option value="">All Branches</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>{b.code}</option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-              <ChevronDown className="size-4 text-muted opacity-50" />
-            </div>
-          </div>
-        )}
-
-        <div className="relative w-full sm:w-44">
-          <Filter className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-          <select
-            aria-label="Filter subjects by year"
-            value={year ?? ""}
-            onChange={(e) => setYearOverride({ value: e.target.value ? Number(e.target.value) : null })}
-            className={selectClass}
-          >
-            <option value="">All Years</option>
-            {ACADEMIC_YEARS.map((y) => (
-              <option key={y.value} value={y.value}>{y.label}</option>
-            ))}
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-            <ChevronDown className="size-4 text-muted opacity-50" />
-          </div>
-        </div>
-      </div>
-
-      {isFiltered && filterSummary && (
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-            Showing {filterSummary}
-          </span>
+      <div className="mb-6 flex h-10 min-w-0 items-center gap-2 overflow-x-auto hide-scrollbar">
+        <Filter size={15} className="shrink-0 text-muted" aria-hidden="true" />
+        <span className="shrink-0 text-xs font-bold text-muted">Branch</span>
+        <button
+          type="button"
+          onClick={() => setBranchOverride({ value: null })}
+          aria-pressed={branchId === null}
+          className={`motion-hover motion-active shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${branchId === null ? "bg-primary text-white" : "bg-surface-hover text-muted hover:text-foreground"}`}
+        >
+          All branches
+        </button>
+        {branches.map((branch) => (
           <button
-            onClick={clearFilters}
-            className="motion-hover inline-flex items-center gap-1 rounded-full border border-border/60 px-3 py-1 text-xs font-bold text-muted hover:text-foreground"
+            key={branch.id}
+            type="button"
+            onClick={() => setBranchOverride({ value: branch.id })}
+            aria-pressed={branchId === branch.id}
+            className={`motion-hover motion-active shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${branchId === branch.id ? "bg-primary text-white" : "bg-surface-hover text-muted hover:text-foreground"}`}
           >
-            <X size={12} /> Show all subjects
+            {branch.code}
           </button>
-        </div>
-      )}
+        ))}
+        <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+        <span className="shrink-0 text-xs font-bold text-muted">Year</span>
+        <button
+          type="button"
+          onClick={() => setYearOverride({ value: null })}
+          aria-pressed={year === null}
+          className={`motion-hover motion-active shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${year === null ? "bg-primary text-white" : "bg-surface-hover text-muted hover:text-foreground"}`}
+        >
+          All years
+        </button>
+        {ACADEMIC_YEARS.map((academicYear) => (
+          <button
+            key={academicYear.value}
+            type="button"
+            onClick={() => setYearOverride({ value: academicYear.value })}
+            aria-pressed={year === academicYear.value}
+            className={`motion-hover motion-active shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${year === academicYear.value ? "bg-primary text-white" : "bg-surface-hover text-muted hover:text-foreground"}`}
+          >
+            {academicYear.label}
+          </button>
+        ))}
+      </div>
 
       {filteredSubjects.length === 0 ? (
         <EmptyState
-          title={search ? `No subjects match “${subjectQuery.trim()}”` : "No subjects match this filter"}
-          message={
-            search
-              ? "Try a different spelling, or clear the search to see everything."
-              : "Clear the branch and year filters to see everything, or upload notes for a class your batch needs."
-          }
+          title="No subjects match this filter"
+          message="Clear the branch and year filters to see everything, or upload notes for a class your batch needs."
           icon={BookOpen}
           action={
             <>
-              <button onClick={() => { setSubjectQuery(""); clearFilters(); }} className="motion-hover motion-active rounded-xl border border-border bg-surface px-4 py-2 text-sm font-bold text-foreground hover:bg-surface-hover">
+              <button onClick={clearFilters} className="motion-hover motion-active rounded-xl border border-border bg-surface px-4 py-2 text-sm font-bold text-foreground hover:bg-surface-hover">
                 Show all subjects
               </button>
               <button onClick={requestUploadPrompt} className="motion-hover motion-active inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:opacity-90">
@@ -170,7 +123,7 @@ export default function SubjectGrid({ subjects, subjectCounts, branches, default
             const count = subjectCounts[sub.name.toUpperCase()] || 0;
 
             return (
-              <motion.div layout key={sub.slug} className={`flex w-full ${spanClass(design.span)}`}>
+              <ScrollReveal key={sub.slug} layout className={`flex w-full ${spanClass(design.span)}`} transition={{ duration: 0.42, delay: Math.min(index * 0.045, 0.3), ease: [0.32, 0.72, 0, 1] }}>
                 <SubjectCard
                   name={sub.name}
                   count={count}
@@ -180,7 +133,7 @@ export default function SubjectGrid({ subjects, subjectCounts, branches, default
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   ref={(el) => { if (el) elementsRef.current[index] = el; }}
                 />
-              </motion.div>
+              </ScrollReveal>
             );
           })}
         </CardGrid>

@@ -1,4 +1,3 @@
-import { createClient } from "@/utils/supabase/server";
 import { Metadata } from "next";
 import HomeClient from "./HomeClient";
 import { Suspense } from "react";
@@ -24,8 +23,8 @@ export const metadata: Metadata = {
 export const revalidate = 300;
 
 export default async function Page() {
-  const supabase = await createClient();
-
+  // Fetch the public catalogue used by the landing page. Public analytics are
+  // loaded by the shell's Analytics panel so they remain available on every route.
   // 1. Fetch subjects
   const subjects = await getCachedSubjects();
 
@@ -35,35 +34,13 @@ export default async function Page() {
   // 3. Fetch the branch catalogue used by the branch/year filters
   const branches = await getCachedBranches();
 
-  // 4. Fetch stats and trending globally (cacheable)
-  const [{ count: modulesCount }, { data: analytics }, { data: recentDocs }] = await Promise.all([
-    supabase.from("modules").select("*", { count: "exact", head: true }),
-    supabase.from("document_analytics").select("view_count, download_count"),
-    supabase.from("documents")
-      .select("*, document_analytics(upvotes, view_count, download_count)")
-      .eq("status", "approved")
-      .order("created_at", { ascending: false })
-      .limit(8)
-  ]);
-
-  const globalStats = {
-    subjects: subjects.length,
-    modules: modulesCount || 0,
-    views: analytics?.reduce((acc, curr) => acc + (curr.view_count || 0), 0) || 0,
-    downloads: analytics?.reduce((acc, curr) => acc + (curr.download_count || 0), 0) || 0,
-  };
-  
-  const trendingDocs = recentDocs || [];
-
   return (
-    <div className="animate-fade-up mx-auto w-full max-w-6xl">
+    <div className="mx-auto w-full max-w-6xl">
       <Suspense fallback={<HomeSkeleton />}>
         <HomeClient
           initialSubjects={subjects}
           counts={counts}
           branches={branches}
-          globalStats={globalStats}
-          trendingDocs={trendingDocs}
         />
       </Suspense>
     </div>

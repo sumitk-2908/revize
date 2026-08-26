@@ -1,6 +1,9 @@
 "use client";
 
 import React from "react";
+import { usePathname } from "next/navigation";
+import { AnalyticsSidebar } from "@/components/layout/AnalyticsSidebar";
+import { PageEnter } from "@/components/ui/Motion";
 
 export const AppShell = ({ children }: { children: React.ReactNode }) => (
   <div className="ease-premium flex min-h-[100dvh] flex-col bg-background text-foreground transition-colors duration-300">
@@ -14,8 +17,21 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
-export const ContentArea = ({ children }: { children: React.ReactNode }) => (
-  <main id="main-content" className="w-full min-w-0 flex-1 overflow-x-clip p-4 pb-24 md:p-6 lg:p-8 lg:pb-8">
+export const ShellContent = ({ children }: { children: React.ReactNode }) => (
+  <div className="mx-auto flex w-full max-w-[1600px] flex-1">
     {children}
-  </main>
+    <AnalyticsSidebar />
+  </div>
 );
+
+export const ContentArea = ({ children }: { children: React.ReactNode }) => {
+  const pathname = usePathname();
+
+  return (
+    <main id="main-content" className="w-full min-w-0 flex-1 overflow-x-clip p-4 pb-24 md:p-6 lg:p-8 lg:pb-8">
+      <PageEnter key={pathname} className="min-h-full">
+        {children}
+      </PageEnter>
+    </main>
+  );
+};

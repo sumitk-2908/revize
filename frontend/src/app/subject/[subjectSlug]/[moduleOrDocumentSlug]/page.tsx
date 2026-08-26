@@ -1,10 +1,12 @@
 import { getCachedSubjectBySlug } from "@/app/lib/api/cached-subjects";
+import { normalizeTitle } from "@/app/lib/subject-config";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import DocumentInteractiveGrid from "@/components/subject/DocumentInteractiveGrid";
 import FilterSortControls from "@/components/subject/FilterSortControls";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { getPaginatedDocumentsByModule } from "@/app/lib/api/documents";
+import Breadcrumb from "@/components/ui/Breadcrumb";
 import { Metadata } from "next";
 import DocumentView, { documentMetadata } from "../document-view";
 
@@ -35,7 +37,7 @@ export async function generateMetadata({
     return documentMetadata(subjectSlug, null, moduleOrDocumentSlug);
   }
 
-  const subjectName = subjectSlug.replace(/-/g, " ").toUpperCase();
+  const subjectName = normalizeTitle(subjectSlug.replace(/-/g, " "));
   const moduleNumber = parseInt(moduleOrDocumentSlug.replace("module-", "")) || 1;
 
   return {
@@ -68,12 +70,12 @@ export default async function ModulePage({
   const categoryStr = typeof category === "string" ? category : "all";
   const sortStr = typeof sort === "string" ? sort : "created_at";
 
-  const subjectName = subjectSlug.replace(/-/g, " ").toUpperCase();
+  const subjectQueryName = subjectSlug.replace(/-/g, " ").toUpperCase();
   const moduleNumber = parseInt(moduleOrDocumentSlug.replace("module-", "")) || 1;
 
   const dbSubject = await getCachedSubjectBySlug(subjectSlug).catch(() => null);
 
-  const subjectDisplayName = dbSubject?.name || subjectName;
+  const subjectDisplayName = normalizeTitle(dbSubject?.name || subjectQueryName);
 
   const { data: documents, total: count } = await getPaginatedDocumentsByModule(
     moduleNumber,
@@ -81,27 +83,33 @@ export default async function ModulePage({
     20,
     categoryStr,
     sortStr,
-    subjectName
+    subjectQueryName
   );
 
   return (
-    <div className="animate-fade-up mx-auto max-w-6xl space-y-6">
-      <Link
-        href={`/subject/${subjectSlug}`}
-        className="inline-flex items-center gap-2 text-xs font-semibold text-muted hover:text-primary"
-      >
-        <ArrowLeft size={14} /> Back to {subjectDisplayName}
-      </Link>
+    <div className="mx-auto max-w-6xl space-y-3 sm:space-y-6">
+      <Breadcrumb />
 
-      <div className="border-b pb-4">
-        <h1 className="text-xl font-extrabold sm:text-2xl">
-          {subjectDisplayName}
-        </h1>
-
-        <p className="mt-1 text-xs font-bold text-primary">
-          Module {moduleNumber} Repository ({count || 0} items)
-        </p>
-      </div>
+      <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <Link
+            href={`/subject/${subjectSlug}`}
+            className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-muted transition-colors hover:text-primary"
+          >
+            <ArrowLeft size={14} /> Back to {subjectDisplayName}
+          </Link>
+          <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-primary">
+            Module {moduleNumber}
+          </p>
+          <h1 className="truncate text-xl font-extrabold tracking-tight sm:text-3xl">
+            {subjectDisplayName} resources
+          </h1>
+        </div>
+        <div className="inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-xs font-bold text-muted">
+          <FileText size={15} className="text-primary" aria-hidden="true" />
+          <span>{count || 0} document{count === 1 ? "" : "s"}</span>
+        </div>
+      </header>
 
       <ErrorBoundary
         title="Document grid could not load"
@@ -112,11 +120,11 @@ export default async function ModulePage({
           initialDocuments={documents || []}
           subjectSlug={subjectSlug}
           paginationConfig={{
-            queryKey: ["module-docs", moduleNumber.toString(), categoryStr, sortStr, subjectName],
+            queryKey: ["module-docs", moduleNumber.toString(), categoryStr, sortStr, subjectQueryName],
             moduleId: moduleNumber,
             category: categoryStr,
             sortBy: sortStr,
-            subjectName: subjectName
+            subjectName: subjectQueryName
           }}
         />
       </ErrorBoundary>

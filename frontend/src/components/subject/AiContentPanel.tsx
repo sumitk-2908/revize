@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Bot, Clipboard, Eye, FileJson, Sparkles, Upload, X } from "lucide-react";
+import { Bot, Check, Clipboard, ClipboardCopy, Eye, FileJson, Sparkles, Upload, X } from "lucide-react";
+import { dispatchToast as showToast } from "@/app/lib/toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     type AiContentKind,
@@ -42,6 +43,7 @@ export default function AiContentPanel({ documentId, title }: { documentId: numb
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const queryClient = useQueryClient();
+    const [copiedPrompt, setCopiedPrompt] = useState(false);
 
     const query = useQuery({
         queryKey: queryKey(documentId),
@@ -144,6 +146,21 @@ export default function AiContentPanel({ documentId, title }: { documentId: numb
         }
     };
 
+    const handleCopyPrompt = async () => {
+        if (!kindInfo) return;
+        const text = `${kindInfo.prompt}\n\n${JSON.stringify(kindInfo.schema, null, 2)}`;
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedPrompt(true);
+            showToast("Copied", "Prompt and schema copied to your clipboard.", "success");
+            window.setTimeout(() => setCopiedPrompt(false), 1500);
+        } catch {
+            showToast("Copy Failed", "Could not copy the prompt and schema.", "error");
+        }
+    };
+
+    const CopyIcon = copiedPrompt ? Check : ClipboardCopy;
+
     return (
         <>
             <button
@@ -188,7 +205,7 @@ export default function AiContentPanel({ documentId, title }: { documentId: numb
                                     {selected && <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${selected.status === "published" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>{selected.status} v{selected.version}</span>}
                                 </div>
 
-                                {kindInfo && <details className="rounded-xl border border-border bg-surface-hover/50 p-3"><summary className="cursor-pointer text-xs font-bold text-foreground">Prompt and schema</summary><pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap text-[11px] text-muted">{kindInfo.prompt}{"\n\n"}{JSON.stringify(kindInfo.schema, null, 2)}</pre></details>}
+                                {kindInfo && <details className="relative rounded-xl border border-border bg-surface-hover/50 p-3"><summary className="cursor-pointer pr-8 text-xs font-bold text-foreground">Prompt and schema</summary><button type="button" onClick={handleCopyPrompt} aria-label="Copy prompt and schema" title="Copy prompt and schema" className="absolute right-2 top-2 rounded-md p-1 text-muted hover:bg-surface-hover hover:text-foreground"><CopyIcon size={14} /></button><pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap text-[11px] text-muted">{kindInfo.prompt}{"\n\n"}{JSON.stringify(kindInfo.schema, null, 2)}</pre></details>}
                                 <label className="block text-xs font-bold text-muted">Model provenance<input value={model} onChange={(event) => setModel(event.target.value)} placeholder="e.g. gemini-2.5-pro" className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" /></label>
                                 <label className="block text-xs font-bold text-muted">JSON draft<textarea value={jsonText} onChange={(event) => setJsonText(event.target.value)} placeholder="Paste the validated JSON object here..." className="mt-1 h-56 w-full rounded-xl border border-border bg-background p-3 font-mono text-xs text-foreground outline-none focus:border-primary" /></label>
 

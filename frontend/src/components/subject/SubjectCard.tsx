@@ -7,6 +7,7 @@ import {
   type CardLayoutKey,
   type ResolvedSubjectDesign,
 } from "@/app/lib/subject-design";
+import { normalizeTitle } from "@/app/lib/subject-config";
 
 export interface SubjectCardProps {
   /** Subject display name. */
@@ -59,9 +60,8 @@ export default function SubjectCard({
 
   const iconTile = (
     <div
-      className={`flex items-center justify-center rounded-xl transition-transform group-hover:scale-110 ${
-        isWide ? "size-14 shrink-0" : "size-12"
-      } ${isInverted ? "bg-white/20 text-current" : `${theme.iconBg} ${theme.icon}`}`}
+      className={`flex items-center justify-center rounded-xl transition-transform group-hover:scale-110 ${isWide ? "size-14 shrink-0" : "size-12"
+        } ${isInverted ? "bg-white/20 text-current" : `${theme.iconBg} ${theme.icon}`}`}
     >
       <Icon size={isWide ? 28 : 24} />
     </div>
@@ -69,9 +69,8 @@ export default function SubjectCard({
 
   const badgePill = badge ? (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-bold tracking-wide ${
-        isInverted ? "bg-white/20 text-current" : `${theme.fill} ${theme.onFill}`
-      }`}
+      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-bold tracking-wide ${isInverted ? "bg-white/20 text-current" : `${theme.fill} ${theme.onFill}`
+        }`}
     >
       {badge}
     </span>
@@ -80,9 +79,8 @@ export default function SubjectCard({
   const countPill =
     count > 0 ? (
       <div
-        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
-          isInverted ? "bg-white/20 text-current" : theme.pill
-        }`}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${isInverted ? "bg-white/20 text-current" : theme.pill
+          }`}
       >
         <FileText size={14} />
         <span>
@@ -91,11 +89,10 @@ export default function SubjectCard({
       </div>
     ) : (
       <div
-        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-          isInverted
-            ? "bg-white/10 text-current opacity-80"
-            : "border border-border/40 bg-background/50 text-muted"
-        }`}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${isInverted
+          ? "bg-white/10 text-current opacity-80"
+          : "border border-border/40 bg-background/50 text-muted"
+          }`}
       >
         <div className={`size-1.5 rounded-full ${isInverted ? "bg-current" : "bg-muted/50"}`} />
         <span>No resources yet</span>
@@ -110,30 +107,29 @@ export default function SubjectCard({
       // The icon sits on the band; the title always clears it, so it stays readable.
       <>
         <div
-          className={`flex items-center justify-center rounded-xl bg-white/25 text-white backdrop-blur-sm transition-transform group-hover:scale-110 ${
-            isWide ? "size-14" : "size-12"
-          }`}
+          className={`flex items-center justify-center rounded-xl bg-white/25 text-white backdrop-blur-sm transition-transform group-hover:scale-110 ${isWide ? "size-14" : "size-12"
+            }`}
         >
           <Icon size={isWide ? 28 : 24} />
         </div>
-        <h2 className={`${isWide ? "mt-6" : "mt-9"} ${titleClass}`}>{name}</h2>
+        <h2 className={`${isWide ? "mt-6" : "mt-9"} ${titleClass}`}>{normalizeTitle(name)}</h2>
       </>
     ) : layout === "minimal" ? (
       <div className="flex items-center gap-3">
         <span className={`shrink-0 ${theme.icon}`}>
           <Icon size={isWide ? 24 : 20} />
         </span>
-        <h2 className={titleClass}>{name}</h2>
+        <h2 className={titleClass}>{normalizeTitle(name)}</h2>
       </div>
     ) : isWide ? (
       <div className="flex items-center gap-4">
         {iconTile}
-        <h2 className={titleClass}>{name}</h2>
+        <h2 className={titleClass}>{normalizeTitle(name)}</h2>
       </div>
     ) : (
       <>
         {iconTile}
-        <h2 className={`mt-4 ${titleClass}`}>{name}</h2>
+        <h2 className={`mt-4 ${titleClass}`}>{normalizeTitle(name)}</h2>
       </>
     );
 
@@ -176,7 +172,7 @@ export default function SubjectCard({
     </>
   );
 
-  const className = `group motion-hover motion-active relative flex w-full flex-col overflow-hidden rounded-2xl text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${shell[layout]}`;
+  const className = `group motion-hover motion-active relative flex w-full flex-col overflow-hidden rounded-2xl text-left shadow-sm transition-all duration-150 hover:-translate-y-1 hover:shadow-md ${shell[layout]}`;
 
   if (!href) {
     return (

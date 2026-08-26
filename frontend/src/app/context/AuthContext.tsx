@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [isStudent, setIsStudent] = useState(false);
-  const [emailConfirmed, setEmailConfirmed] = useState(true); 
+  const [emailConfirmed, setEmailConfirmed] = useState(true);
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authPromptContext, setAuthPromptContext] = useState<AuthPromptFeature | null>(null);
@@ -119,9 +119,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => syncUserFromSession(session));
-    return () => subscription.unsubscribe();
-  }, [syncUserFromSession]);
+    let mounted = true;
+
+    const syncSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted) await syncUserFromSession(session);
+    };
+
+    void syncSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      void syncUserFromSession(session);
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
+        router.refresh();
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [router, syncUserFromSession]);
 
   useEffect(() => {
     const handleAuthPrompt = (event: Event) => {
@@ -173,14 +192,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (authMode === "signup") {
         const { data, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword, options: { emailRedirectTo: window.location.origin } });
         if (error) throw error;
-        if (data.session) { 
-          await syncUserFromSession(data.session); 
-          setAuthPassword(""); 
-          handleAuthModalOpenChange(false); 
+        await router.refresh();
+        if (data.session) {
+          await syncUserFromSession(data.session);
+          setAuthPassword("");
+          handleAuthModalOpenChange(false);
           queryClient.invalidateQueries();
-          router.refresh(); 
+        } else {
+          showToast("Registration Complete", "Please verify your email.", "success");
+          setAuthMode("signin");
         }
-        else { showToast("Registration Complete", "Please verify your email.", "success"); setAuthMode("signin"); }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
         if (error) throw error;
@@ -188,18 +209,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAuthPassword("");
         handleAuthModalOpenChange(false);
         queryClient.invalidateQueries();
-        router.refresh();
+        await router.refresh();
       }
-    } catch (err: any) { showToast("Authentication Error", err.message, "error"); } 
+    } catch (err: any) { showToast("Authentication Error", err.message, "error"); }
     finally { setAuthLoading(false); }
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      showToast("Sign-Out Error", error.message, "error");
+      return;
+    }
     sessionStorage.removeItem("admin_portal_auth");
     localStorage.removeItem("portal_bookmarks");
     localStorage.removeItem("portal_study_history");
     setIsAdmin(false); setIsStudent(false);
+    await router.refresh();
     router.push('/');
   };
 

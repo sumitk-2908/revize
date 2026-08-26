@@ -1,18 +1,19 @@
 "use client";
 
 import { useAuth } from "@/app/context/AuthContext";
+import { motion, useReducedMotion } from "framer-motion";
 import { GraduationCap, ShieldCheck, Cloud, Zap, Users } from "lucide-react";
-import { FeaturesCarousel } from "./FeaturesCarousel";
 
-export interface PlatformStats {
-  subjects: number;
-  modules: number;
-  views: number;
-  downloads: number;
-}
+const HERO_EASE = [0.32, 0.72, 0, 1] as const;
 
-export function LandingHero({ stats, trendingDocs = [] }: { stats?: PlatformStats, trendingDocs?: any[] }) {
+export function LandingHero() {
   const { setAuthMode, setShowAuthModal } = useAuth();
+  const reduceMotion = useReducedMotion();
+  const reveal = (delay: number) => ({
+    initial: reduceMotion ? false : { opacity: 0, y: 12 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: reduceMotion ? 0 : 0.42, delay: reduceMotion ? 0 : delay, ease: HERO_EASE },
+  });
 
   const handleSignUp = () => {
     setAuthMode("signup");
@@ -20,50 +21,36 @@ export function LandingHero({ stats, trendingDocs = [] }: { stats?: PlatformStat
   };
 
   return (
-    <div className="relative mx-auto max-w-full px-4 pt-16 sm:pt-24 pb-12 overflow-hidden">
-      {/* Background Gradients */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -z-10 aspect-[1155/678] w-[36.125rem] max-w-none -translate-x-1/2 bg-gradient-to-tr from-primary/10 to-transparent opacity-40 sm:w-[72.1875rem] blur-3xl"></div>
-      </div>
-
+    <div className="relative mx-auto max-w-full overflow-hidden px-4 pb-12 pt-16 sm:pt-24">
       <div className="flex flex-col items-center text-center">
-        {/* Top Badge */}
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary dark:bg-primary/20">
+        <motion.div {...reveal(0)} className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary dark:bg-primary/20">
           <GraduationCap size={16} />
           Built for Students, by Students
-        </div>
+        </motion.div>
 
-        {/* Headline */}
-        <h1 className="mb-6 max-w-4xl text-5xl font-extrabold tracking-tight text-foreground sm:text-7xl">
+        <motion.h1 {...reveal(0.06)} className="mb-6 max-w-4xl text-4xl font-extrabold text-foreground sm:text-6xl">
           Everything You Need to <br className="hidden sm:block" />
           Study <span className="text-primary">Smarter</span>
-        </h1>
+        </motion.h1>
 
-        {/* Subtitle */}
-        <p className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-muted sm:text-xl">
+        <motion.p {...reveal(0.12)} className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-muted sm:text-xl">
           Explore the powerful features designed to help you access, organize, and
           make the most of your academic journey.
-        </p>
+        </motion.p>
 
-        {/* CTA (Optional but good for conversions, not explicitly in the cropped screenshot but typically below subtitle) */}
-        <div className="mb-16">
+        <motion.div {...reveal(0.18)} className="mb-16">
           <button
             onClick={handleSignUp}
-            className="motion-hover motion-active rounded-full bg-primary px-8 py-4 text-lg font-bold text-primary-foreground shadow-lg hover:opacity-90 hover:shadow-primary/25"
+            className="motion-hover motion-active rounded-lg bg-primary px-7 py-3.5 text-lg font-bold text-primary-foreground shadow-lg hover:opacity-90 hover:shadow-primary/25"
           >
             Join the Community
           </button>
-        </div>
-      </div>
-
-      {/* Carousel Section */}
-      <div className="mb-20">
-        <FeaturesCarousel trendingDocs={trendingDocs} />
+        </motion.div>
       </div>
 
       {/* Bottom Features Row */}
-      <div className="mx-auto max-w-6xl">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 px-4">
+      <motion.div {...reveal(0.24)} className="mx-auto max-w-6xl border-t border-border pt-8">
+        <div className="grid gap-8 px-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400">
               <ShieldCheck size={24} />
@@ -97,31 +84,12 @@ export function LandingHero({ stats, trendingDocs = [] }: { stats?: PlatformStat
             </div>
             <div>
               <h4 className="font-bold text-foreground">Built for Students</h4>
-              <p className="text-sm text-muted">Made with ❤️ to support your academic success.</p>
+              <p className="text-sm text-muted">Made to support your academic success.</p>
             </div>
           </div>
         </div>
 
-        {/* Real Analytics / Social Proof */}
-        {stats && (
-          <div className="mt-16 border-t border-border/50 pt-10">
-            <div className="flex flex-wrap justify-center gap-8 md:gap-16">
-              <div className="text-center">
-                <p className="text-3xl font-extrabold text-primary">{stats.subjects}+</p>
-                <p className="text-sm font-semibold uppercase tracking-wider text-muted mt-1">Subjects</p>
-              </div>
-              <div className="text-center">
-                <p className="text-3xl font-extrabold text-foreground">{stats.downloads.toLocaleString()}</p>
-                <p className="text-sm font-semibold uppercase tracking-wider text-muted mt-1">Downloads</p>
-              </div>
-              <div className="text-center">
-                <p className="text-3xl font-extrabold text-foreground">{stats.views.toLocaleString()}</p>
-                <p className="text-sm font-semibold uppercase tracking-wider text-muted mt-1">Views</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      </motion.div>
     </div>
   );
 }

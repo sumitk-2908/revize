@@ -3,22 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight, Home } from "lucide-react";
+import { normalizeTitle } from "@/app/lib/subject-config";
 
 export default function Breadcrumb() {
   const pathname = usePathname();
-  
+
   if (!pathname || pathname === "/") return null;
-  
+
   const segments = pathname.split("/").filter(Boolean);
-  
+
   const breadcrumbs = segments.map((segment, index) => {
     const href = "/" + segments.slice(0, index + 1).join("/");
     // Format segment nicely
-    let label = segment.replace(/-/g, " ");
-    if (label.toLowerCase() === "dbms") label = "DBMS";
-    else if (label.toLowerCase() === "co") label = "CO";
-    else if (label.toLowerCase() === "os") label = "OS";
-    else label = label.replace(/\b\w/g, char => char.toUpperCase());
+    const label = normalizeTitle(segment.replace(/-/g, " "));
 
     return { href, label, isSubject: segment === "subject" && index === 0 };
   }).filter(crumb => !crumb.isSubject);
@@ -32,10 +29,10 @@ export default function Breadcrumb() {
             Subjects
           </Link>
         </li>
-        
+
         {breadcrumbs.map((crumb, index) => {
           const isLast = index === breadcrumbs.length - 1;
-          
+
           return (
             <li key={crumb.href} className="flex items-center gap-1.5">
               <ChevronRight size={14} className="opacity-50" />

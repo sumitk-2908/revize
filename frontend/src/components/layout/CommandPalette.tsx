@@ -4,18 +4,17 @@ import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import Fuse from "fuse.js";
-import { 
+import {
   Search, Clock, Bookmark, Upload, User, FileText, Command, X, ArrowRight, CornerDownLeft, FolderOpen
 } from "lucide-react";
 import { useSubjects } from "@/app/hooks/useSubjects";
+import { useSearchHistory } from "@/app/hooks/useSearchHistory";
 import { useSidebar } from "@/app/context/SidebarContext";
 import { useAuth } from "@/app/context/AuthContext";
 import { requestUploadPrompt } from "@/app/lib/student-prompts";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { InlineSpinner } from "@/components/layout/SharedLayouts";
 import { subjectSlug, documentHref } from "@/components/layout/utils";
-
-const RECENT_SEARCHES_KEY = "portal_recent_searches";
 
 type CommandItem = {
   id: string;
@@ -24,6 +23,7 @@ type CommandItem = {
   section: string;
   icon: React.ReactNode;
   action: () => void;
+  historyEntry?: string;
 };
 
 export const CommandPalette = ({ open, onOpenChange, isMac }: { open: boolean; onOpenChange: (open: boolean) => void; isMac: boolean }) => {
@@ -33,14 +33,7 @@ export const CommandPalette = ({ open, onOpenChange, isMac }: { open: boolean; o
   const inputRef = useRef<HTMLInputElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const { data: subjects = [] } = useSubjects();
-  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || "[]");
-    } catch {
-      return [];
-    }
-  });
+  const { history, addToHistory, removeFromHistory, clearHistory } = useSearchHistory();
   const isSignedIn = isAdmin || isStudent;
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -49,25 +42,17 @@ export const CommandPalette = ({ open, onOpenChange, isMac }: { open: boolean; o
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
 
-  const saveRecentSearch = useCallback((query: string) => {
-    const value = query.trim();
-    if (!value) return;
-    const next = [value, ...recentSearches.filter((item) => item.toLowerCase() !== value.toLowerCase())].slice(0, 5);
-    setRecentSearches(next);
-    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
-  }, [recentSearches]);
-
   const closePalette = useCallback(() => {
     onOpenChange(false);
     setActiveIndex(0);
   }, [onOpenChange]);
 
   const navigateTo = useCallback((href: string) => {
-    saveRecentSearch(searchQuery);
+    addToHistory(searchQuery);
     closePalette();
     setSearchQuery("");
     router.push(href);
-  }, [closePalette, searchQuery, setSearchQuery, router, saveRecentSearch]);
+  }, [addToHistory, closePalette, searchQuery, setSearchQuery, router]);
 
   const quickActions = useMemo<CommandItem[]>(() => [
     {
@@ -141,21 +126,22 @@ export const CommandPalette = ({ open, onOpenChange, isMac }: { open: boolean; o
     action: () => navigateTo(documentHref(doc)),
   })), [globalSearchResults, navigateTo]);
 
-  const recentItems = useMemo<CommandItem[]>(() => recentSearches
+  const recentItems = useMemo<CommandItem[]>(() => history
     .filter((item) => !normalizedQuery || item.toLowerCase().includes(normalizedQuery))
     .map((item) => ({
       id: `recent-${item}`,
       label: item,
       description: "Search again",
-      section: "Recent Searches",
+      section: "Recent",
       icon: <Clock size={16} className="text-muted" aria-hidden="true" />,
+      historyEntry: item,
       action: () => {
         setSearchQuery(item);
-        saveRecentSearch(item);
+        addToHistory(item);
         setActiveIndex(0);
         inputRef.current?.focus();
       },
-    })), [setSearchQuery, normalizedQuery, recentSearches, saveRecentSearch]);
+    })), [addToHistory, history, normalizedQuery, setSearchQuery]);
 
   const visibleQuickActions = useMemo<CommandItem[]>(() => {
     if (!normalizedQuery) return quickActions;
@@ -211,85 +197,115 @@ export const CommandPalette = ({ open, onOpenChange, isMac }: { open: boolean; o
             className="m-4"
           >
             <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-            <Command size={18} className="hidden text-muted sm:block" aria-hidden="true" />
-            <Search size={18} className="text-muted sm:hidden" aria-hidden="true" />
-            <input
-              ref={inputRef}
-              value={searchQuery}
-              onChange={(event) => {
-                setSearchQuery(event.target.value);
-                setActiveIndex(0);
-              }}
-              onKeyDown={handleKeyDown}
-              role="combobox"
-              aria-expanded="true"
-              aria-controls="command-palette-results"
-              aria-activedescendant={items[selectedIndex]?.id}
-              placeholder="Search documents, subjects, modules, actions..."
-              className="h-10 min-w-0 flex-1 bg-transparent text-lg font-semibold text-foreground outline-none placeholder:text-muted"
-            />
-            <kbd className="hidden rounded-lg border border-border bg-background px-2 py-1 font-mono text-xs font-bold text-muted sm:inline-flex">
-              {isMac ? "⌘K" : "Ctrl K"}
-            </kbd>
-            <Dialog.Close asChild>
-              <button type="button" aria-label="Close command palette" className="motion-hover motion-active rounded-lg p-1.5 text-muted hover:bg-surface-hover hover:text-foreground">
-                <X size={18} />
-              </button>
-            </Dialog.Close>
-          </div>
-
-          <div id="command-palette-results" role="listbox" className="max-h-[68vh] overflow-y-auto p-2">
-            <div aria-live="polite" className="sr-only">
-              {isSearching ? "Searching..." : `${items.length} results found`}
+              <Command size={18} className="hidden text-muted sm:block" aria-hidden="true" />
+              <Search size={18} className="text-muted sm:hidden" aria-hidden="true" />
+              <input
+                ref={inputRef}
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setActiveIndex(0);
+                }}
+                onKeyDown={handleKeyDown}
+                role="combobox"
+                aria-expanded="true"
+                aria-controls="command-palette-results"
+                aria-activedescendant={items[selectedIndex]?.id}
+                placeholder="Search documents, subjects, modules, actions..."
+                className="h-10 min-w-0 flex-1 bg-transparent text-lg font-semibold text-foreground outline-none placeholder:text-muted"
+              />
+              <kbd className="hidden rounded-lg border border-border bg-background px-2 py-1 font-mono text-xs font-bold text-muted sm:inline-flex">
+                {isMac ? "⌘K" : "Ctrl K"}
+              </kbd>
+              <Dialog.Close asChild>
+                <button type="button" aria-label="Close command palette" className="motion-hover motion-active rounded-lg p-1.5 text-muted hover:bg-surface-hover hover:text-foreground">
+                  <X size={18} />
+                </button>
+              </Dialog.Close>
             </div>
-            {isSearching && normalizedQuery && (
-              <div className="flex items-center gap-2 p-3 text-xs font-bold text-muted">
-                <InlineSpinner label="Searching" size={14} /> Searching documents
-              </div>
-            )}
-            {!isSearching && normalizedQuery && documentItems.length === 0 && (
-              <div className="p-3 text-xs font-semibold text-muted">No documents found. Try a subject, module, or quick action.</div>
-            )}
 
-            {Object.entries(groupedItems).map(([section, sectionItems]) => (
-              <div key={section} className="py-1">
-                <p className="px-3 py-2 text-xs font-bold tracking-[0.06em] text-muted uppercase">{section}</p>
-                <div className="space-y-1">
-                  {sectionItems.map((item) => {
-                    const itemIndex = renderedIndex++;
-                    const isActive = itemIndex === selectedIndex;
-                    return (
-                      <button
-                        key={item.id}
-                        id={item.id}
-                        type="button"
-                        role="option"
-                        aria-selected={isActive}
-                        onMouseEnter={() => setActiveIndex(itemIndex)}
-                        onClick={item.action}
-                        className={`motion-hover flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ${isActive ? "bg-accent text-foreground" : "text-foreground hover:bg-surface-hover"}`}
-                      >
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background">{item.icon}</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-bold">{item.label}</span>
-                          {item.description && <span className="block truncate text-xs font-semibold text-muted">{item.description}</span>}
-                        </span>
-                        <CornerDownLeft size={14} className={`shrink-0 ${isActive ? "text-primary" : "text-muted"}`} aria-hidden="true" />
-                      </button>
-                    );
-                  })}
+            <div id="command-palette-results" role="listbox" className="max-h-[68vh] overflow-y-auto p-2">
+              <div aria-live="polite" className="sr-only">
+                {isSearching ? "Searching..." : `${items.length} results found`}
+              </div>
+              {isSearching && normalizedQuery && (
+                <div className="flex items-center gap-2 p-3 text-xs font-bold text-muted">
+                  <InlineSpinner label="Searching" size={14} /> Searching documents
                 </div>
-              </div>
-            ))}
+              )}
+              {!isSearching && normalizedQuery && documentItems.length === 0 && (
+                <div className="p-3 text-xs font-semibold text-muted">No documents found. Try a subject, module, or quick action.</div>
+              )}
 
-            {!isSearching && items.length === 0 && (
-              <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
-                <Search size={24} className="text-muted" aria-hidden="true" />
-                <p className="mt-3 text-sm font-bold text-foreground">No commands found</p>
-                <p className="mt-1 text-xs font-semibold text-muted">Try a document title, subject name, module, or action.</p>
-              </div>
-            )}
-          </div>
+              {Object.entries(groupedItems).map(([section, sectionItems]) => (
+                <div key={section} className="py-1">
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <p className="text-xs font-bold tracking-[0.06em] text-muted uppercase">{section}</p>
+                    {section === "Recent" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clearHistory();
+                          setActiveIndex(0);
+                          inputRef.current?.focus();
+                        }}
+                        className="text-xs font-semibold text-muted transition-colors duration-150 hover:text-primary"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    {sectionItems.map((item) => {
+                      const itemIndex = renderedIndex++;
+                      const isActive = itemIndex === selectedIndex;
+                      return (
+                        <div key={item.id} className="group relative">
+                          <button
+                            id={item.id}
+                            type="button"
+                            role="option"
+                            aria-selected={isActive}
+                            onMouseEnter={() => setActiveIndex(itemIndex)}
+                            onClick={item.action}
+                            className={`motion-hover flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ${item.historyEntry ? "pr-10" : ""} ${isActive ? "bg-accent text-foreground" : "text-foreground hover:bg-surface-hover"}`}
+                          >
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background">{item.icon}</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-bold">{item.label}</span>
+                              {item.description && <span className="block truncate text-xs font-semibold text-muted">{item.description}</span>}
+                            </span>
+                            {!item.historyEntry && <CornerDownLeft size={14} className={`shrink-0 ${isActive ? "text-primary" : "text-muted"}`} aria-hidden="true" />}
+                          </button>
+                          {item.historyEntry && (
+                            <button
+                              type="button"
+                              aria-label={`Remove ${item.label} from recent searches`}
+                              onClick={() => {
+                                removeFromHistory(item.historyEntry!);
+                                setActiveIndex(0);
+                                inputRef.current?.focus();
+                              }}
+                              className="absolute top-1/2 right-3 -translate-y-1/2 p-1 text-muted opacity-0 transition-[color,opacity] duration-150 group-hover:opacity-100 hover:text-primary focus-visible:opacity-100"
+                            >
+                              <X size={12} aria-hidden="true" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {!isSearching && items.length === 0 && (
+                <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+                  <Search size={24} className="text-muted" aria-hidden="true" />
+                  <p className="mt-3 text-sm font-bold text-foreground">No commands found</p>
+                  <p className="mt-1 text-xs font-semibold text-muted">Try a document title, subject name, module, or action.</p>
+                </div>
+              )}
+            </div>
           </ErrorBoundary>
 
           <div className="hidden items-center justify-between border-t border-border px-4 py-2 text-xs font-semibold text-muted sm:flex">

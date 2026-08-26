@@ -123,8 +123,8 @@ export default function ResubmitModal({ document, isOpen, onClose, onSuccess }: 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+    <div className="motion-modal-static fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+      <div role="dialog" aria-modal="true" className="motion-modal-static w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
 
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
@@ -190,8 +190,8 @@ export default function ResubmitModal({ document, isOpen, onClose, onSuccess }: 
               <div
                 onClick={() => { if (uploadState === "idle" || uploadState === "error") fileInputRef.current?.click() }}
                 className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-background p-6 transition-colors ${(uploadState === "idle" || uploadState === "error")
-                    ? "hover:border-primary hover:bg-primary/5"
-                    : "cursor-not-allowed opacity-50"
+                  ? "hover:border-primary hover:bg-primary/5"
+                  : "cursor-not-allowed opacity-50"
                   }`}
               >
                 {newFile ? (

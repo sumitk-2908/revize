@@ -13,6 +13,38 @@ import {
   Users
 } from "lucide-react";
 
+// Display-only acronyms. Query and routing values remain unchanged.
+const TITLE_ACRONYMS = new Set([
+  "BEE",
+  "BME",
+  "CO",
+  "CSE",
+  "DBMS",
+  "DM",
+  "ECE",
+  "EE",
+  "NSS",
+  "OS",
+  "PPS",
+  "PYQ",
+]);
+
+/** Normalize user-facing subject, module, and resource titles. */
+export function normalizeTitle(value: string) {
+  const trimmedValue = value.trim();
+  const subjectKey = trimmedValue.toLowerCase().replace(/\s+/g, "-");
+  const mappedTitle = SUBJECT_UI_MAP[subjectKey]?.title;
+
+  if (mappedTitle) return mappedTitle;
+
+  return trimmedValue.replace(/[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*/g, word => {
+    const upperWord = word.toUpperCase();
+    return TITLE_ACRONYMS.has(upperWord)
+      ? upperWord
+      : `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`;
+  });
+}
+
 // Academic years a subject can be offered in, and that a student can belong to.
 export const ACADEMIC_YEARS = [
   { value: 1, label: "1st year" },
@@ -29,29 +61,30 @@ export const getYearLabel = (year: number | null) =>
 // Primary (Indigo), Success (Emerald), Warning (Amber), Destructive (Red), Muted (Zinc)
 
 export const SUBJECT_UI_MAP: Record<string, any> = {
-   "maths-1": { icon: Calculator, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
-   "maths-2": { icon: Calculator, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
-   "pps": { icon: Terminal, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
-   "communication-skills": { icon: MessageSquare, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
-   
-   "biology": { icon: Leaf, color: "text-success", bg: "bg-success/10", hoverBg: "group-hover:bg-success", border: "border-success", topBar: "bg-success" },
-   "environmental-science": { icon: Globe, color: "text-success", bg: "bg-success/10", hoverBg: "group-hover:bg-success", border: "border-success", topBar: "bg-success" },
-   "chemistry": { icon: Beaker, color: "text-success", bg: "bg-success/10", hoverBg: "group-hover:bg-success", border: "border-success", topBar: "bg-success" },
-   "chemistry-lab": { icon: Beaker, color: "text-success", bg: "bg-success/10", hoverBg: "group-hover:bg-success", border: "border-success", topBar: "bg-success" },
+  "maths-1": { icon: Calculator, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
+  "maths-2": { icon: Calculator, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
+  "pps": { title: "PPS", icon: Terminal, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
+  "dm": { title: "Discrete Mathematics", icon: Calculator, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
+  "communication-skills": { icon: MessageSquare, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
 
-   "physics": { icon: Atom, color: "text-warning", bg: "bg-warning/10", hoverBg: "group-hover:bg-warning", border: "border-warning", topBar: "bg-warning" },
-   "physics-lab": { icon: Beaker, color: "text-warning", bg: "bg-warning/10", hoverBg: "group-hover:bg-warning", border: "border-warning", topBar: "bg-warning" },
-   "bee": { icon: Zap, color: "text-warning", bg: "bg-warning/10", hoverBg: "group-hover:bg-warning", border: "border-warning", topBar: "bg-warning" },
-   "bee-lab": { icon: Zap, color: "text-warning", bg: "bg-warning/10", hoverBg: "group-hover:bg-warning", border: "border-warning", topBar: "bg-warning" },
+  "biology": { icon: Leaf, color: "text-success", bg: "bg-success/10", hoverBg: "group-hover:bg-success", border: "border-success", topBar: "bg-success" },
+  "environmental-science": { icon: Globe, color: "text-success", bg: "bg-success/10", hoverBg: "group-hover:bg-success", border: "border-success", topBar: "bg-success" },
+  "chemistry": { icon: Beaker, color: "text-success", bg: "bg-success/10", hoverBg: "group-hover:bg-success", border: "border-success", topBar: "bg-success" },
+  "chemistry-lab": { icon: Beaker, color: "text-success", bg: "bg-success/10", hoverBg: "group-hover:bg-success", border: "border-success", topBar: "bg-success" },
 
-   "workshop": { icon: Wrench, color: "text-destructive", bg: "bg-destructive/10", hoverBg: "group-hover:bg-destructive", border: "border-destructive", topBar: "bg-destructive" },
-   "be": { icon: BookOpen, color: "text-destructive", bg: "bg-destructive/10", hoverBg: "group-hover:bg-destructive", border: "border-destructive", topBar: "bg-destructive" },
-   "be-lab": { icon: BookOpen, color: "text-destructive", bg: "bg-destructive/10", hoverBg: "group-hover:bg-destructive", border: "border-destructive", topBar: "bg-destructive" },
-   "bme": { icon: Wrench, color: "text-destructive", bg: "bg-destructive/10", hoverBg: "group-hover:bg-destructive", border: "border-destructive", topBar: "bg-destructive" },
-   "nss": { icon: Users, color: "text-destructive", bg: "bg-destructive/10", hoverBg: "group-hover:bg-destructive", border: "border-destructive", topBar: "bg-destructive" },
+  "physics": { icon: Atom, color: "text-warning", bg: "bg-warning/10", hoverBg: "group-hover:bg-warning", border: "border-warning", topBar: "bg-warning" },
+  "physics-lab": { icon: Beaker, color: "text-warning", bg: "bg-warning/10", hoverBg: "group-hover:bg-warning", border: "border-warning", topBar: "bg-warning" },
+  "bee": { title: "BEE", icon: Zap, color: "text-warning", bg: "bg-warning/10", hoverBg: "group-hover:bg-warning", border: "border-warning", topBar: "bg-warning" },
+  "bee-lab": { title: "BEE Lab", icon: Zap, color: "text-warning", bg: "bg-warning/10", hoverBg: "group-hover:bg-warning", border: "border-warning", topBar: "bg-warning" },
 
-   "engineering-graphics": { icon: PenTool, color: "text-sky-500", bg: "bg-sky-500/10", hoverBg: "group-hover:bg-sky-500", border: "border-sky-500", topBar: "bg-sky-500" },
-   
-   "default": { icon: BookOpen, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" }
+  "workshop": { icon: Wrench, color: "text-destructive", bg: "bg-destructive/10", hoverBg: "group-hover:bg-destructive", border: "border-destructive", topBar: "bg-destructive" },
+  "be": { title: "BE", icon: BookOpen, color: "text-destructive", bg: "bg-destructive/10", hoverBg: "group-hover:bg-destructive", border: "border-destructive", topBar: "bg-destructive" },
+  "be-lab": { title: "BE Lab", icon: BookOpen, color: "text-destructive", bg: "bg-destructive/10", hoverBg: "group-hover:bg-destructive", border: "border-destructive", topBar: "bg-destructive" },
+  "bme": { title: "BME", icon: Wrench, color: "text-destructive", bg: "bg-destructive/10", hoverBg: "group-hover:bg-destructive", border: "border-destructive", topBar: "bg-destructive" },
+  "nss": { title: "NSS", icon: Users, color: "text-destructive", bg: "bg-destructive/10", hoverBg: "group-hover:bg-destructive", border: "border-destructive", topBar: "bg-destructive" },
+
+  "engineering-graphics": { icon: PenTool, color: "text-sky-500", bg: "bg-sky-500/10", hoverBg: "group-hover:bg-sky-500", border: "border-sky-500", topBar: "bg-sky-500" },
+
+  "default": { icon: BookOpen, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" }
 };
-
+

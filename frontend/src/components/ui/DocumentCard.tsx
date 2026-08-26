@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Download, Eye, Bookmark, Trash2, FileText, NotebookPen, FileQuestion, ListChecks, ThumbsUp, BookOpen, type LucideIcon } from "lucide-react";
-import { SUBJECT_UI_MAP } from "@/app/lib/subject-config";
+import { SUBJECT_UI_MAP, normalizeTitle } from "@/app/lib/subject-config";
 import { InlineSpinner } from "@/components/layout/SharedLayouts";
 import type { DocumentWithAnalytics } from "@/app/lib/document-types";
 import { subjectSlug as generateSlug, documentPath } from "@/components/layout/utils";
@@ -16,6 +16,16 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   tutorial_sheet: BookOpen,
   syllabus: ListChecks
 };
+
+const CATEGORY_LABELS: Record<string, string> = {
+  notes: "Notes",
+  pyq: "PYQ",
+  tutorial_sheet: "Tutorial Sheet",
+  syllabus: "Syllabus"
+};
+
+const getCategoryLabel = (category: string) =>
+  CATEGORY_LABELS[category] || category.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 const getTimeAgo = (dateStr: string | null) => {
   if (!dateStr) return "recently";
@@ -64,6 +74,16 @@ export default function DocumentCard({
   const slug = subjectSlug || (doc.subject ? generateSlug(doc.subject) : "default");
   const ui = SUBJECT_UI_MAP[slug] || SUBJECT_UI_MAP["default"];
   const accentBorderColor = ui.border ? ui.border.replace('border-', 'border-l-') : 'border-l-muted';
+  const gradientWashClass = {
+    "border-primary": "bg-linear-to-br from-primary/5 via-surface to-primary/5",
+    "border-success": "bg-linear-to-br from-success/5 via-surface to-success/5",
+    "border-warning": "bg-linear-to-br from-warning/5 via-surface to-warning/5",
+    "border-destructive": "bg-linear-to-br from-destructive/5 via-surface to-destructive/5",
+    "border-sky-500": "bg-linear-to-br from-sky-500/5 via-surface to-sky-500/5",
+  }[ui.border as string] || "bg-linear-to-br from-primary/5 via-surface to-primary/5";
+  const analyticsObj = Array.isArray(doc.document_analytics) ? doc.document_analytics[0] : doc.document_analytics;
+  const viewCount = analyticsObj?.view_count || 0;
+  const upvoteCount = currentUpvoteCount !== undefined ? currentUpvoteCount : (analyticsObj?.upvotes || 0);
 
   const Icon = CATEGORY_ICONS[doc.category] || FileText;
   const targetSubjectSlug = subjectSlug || (doc.subject ? generateSlug(doc.subject) : "default");
@@ -85,11 +105,11 @@ export default function DocumentCard({
   ) : null;
 
   return (
-    <article className={`group flex flex-col rounded-2xl border border-l-[3px] ${accentBorderColor} motion-hover p-5 shadow-sm hover:-translate-y-1 hover:shadow-md ${isSuggestion
-      ? "border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40 hover:border-y-amber-500/40 dark:hover:border-indigo-500"
+    <article className={`group flex flex-col rounded-2xl border border-l-[3px] ${accentBorderColor} ${gradientWashClass} p-4 shadow-sm transition duration-150 hover:-translate-y-1 hover:shadow-md sm:p-5 ${isSuggestion
+      ? "border-amber-500/20 hover:border-amber-500/40 hover:border-y-amber-500/40 dark:hover:border-indigo-500"
       : isBookmarked
-        ? "border-warning/20 bg-warning/5 hover:border-warning/40 hover:border-y-warning/40"
-        : "border-border bg-surface hover:border-y-border hover:border-r-border"
+        ? "border-warning/20 hover:border-warning/40 hover:border-y-warning/40"
+        : "border-border hover:border-y-border hover:border-r-border"
       }`}>
 
       {isSuggestion && badgeText && (
@@ -99,7 +119,7 @@ export default function DocumentCard({
       )}
 
       {/* Thumbnail with category badge (top-left) and bookmark button (top-right) */}
-      <div className="relative mb-4 flex h-32 w-full items-center justify-center overflow-hidden rounded-xl bg-background">
+      <div className="relative mb-3 flex h-24 w-full items-center justify-center overflow-hidden rounded-xl bg-background sm:mb-4 sm:h-32">
         {doc.thumbnail_url ? (
           <Image src={doc.thumbnail_url} alt={`${doc.title} thumbnail`} fill sizes="(max-width: 768px) 100vw, 33vw" className="motion-hover size-full object-cover object-top opacity-90 group-hover:opacity-100" />
         ) : (
@@ -108,8 +128,8 @@ export default function DocumentCard({
           </div>
         )}
         {/* Category Badge: top-left */}
-        <span className="absolute top-2 left-2 rounded-md bg-foreground/80 px-2 py-1 text-xs font-extrabold tracking-wider text-background uppercase shadow-sm backdrop-blur-md">
-          {doc.category}
+        <span className="absolute top-2 left-2 rounded-md bg-foreground/80 px-2 py-1 text-xs font-extrabold text-background shadow-sm backdrop-blur-md">
+          {getCategoryLabel(doc.category)}
         </span>
         {/* Bookmark Button: top-right */}
         {showBookmarkTooltip && bookmarkButton ? (
@@ -122,10 +142,16 @@ export default function DocumentCard({
       </div>
 
       <div className="flex flex-1 flex-col">
-        {/* Card Title */}
-        <h3 className="line-clamp-2 min-h-[2.5rem] text-xl leading-tight font-bold tracking-tight text-foreground">
-          {doc.title}
-        </h3>
+        <div className="flex items-start gap-3">
+          {/* Card Title */}
+          <h3 className="line-clamp-2 min-h-[2.25rem] min-w-0 flex-1 text-xl leading-tight font-medium tracking-tight text-foreground sm:min-h-[2.5rem]">
+            {normalizeTitle(doc.title)}
+          </h3>
+          {/* File type chip: top-right of the card details, clear of the bookmark overlay. */}
+          <span className="shrink-0 rounded-md border border-border/60 bg-background/70 px-2 py-1 text-[10px] font-bold tracking-wide text-muted shadow-sm backdrop-blur-md">
+            {getFileLabel(doc.file_url)}
+          </span>
+        </div>
 
         <div className="mt-1 flex items-center gap-1.5">
           {doc.uploaded_by && doc.uploader_name ? (
@@ -159,8 +185,8 @@ export default function DocumentCard({
         )}
       </div>
 
-      {/* Bottom action row: Download · View · Upvote */}
-      <div className="mt-4 flex gap-2 border-t border-border pt-4">
+      {/* Bottom action row: download action plus inline view and upvote counts. */}
+      <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 sm:mt-4 sm:pt-4">
         <button
           aria-label={isDownloading ? `Downloading ${doc.title}` : `Download ${doc.title}`}
           title={isDownloading ? "Downloading" : "Download"}
@@ -172,27 +198,28 @@ export default function DocumentCard({
 
         <Link
           href={docHref}
-          aria-label={`View ${doc.title}`}
+          aria-label={`View ${doc.title}, ${viewCount} view${viewCount !== 1 ? "s" : ""}`}
           className="motion-hover motion-active inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-transparent bg-primary py-2 text-sm font-bold text-primary-foreground hover:opacity-90"
         >
-          <Eye size={13} aria-hidden="true" /> View
+          <Eye size={13} aria-hidden="true" /> {viewCount}
         </Link>
 
-        {onToggleUpvote && (() => {
-          const analyticsObj = Array.isArray(doc.document_analytics) ? doc.document_analytics[0] : doc.document_analytics;
-          const displayCount = currentUpvoteCount !== undefined ? currentUpvoteCount : (analyticsObj?.upvotes || 0);
-          return (
-            <button
-              onClick={() => onToggleUpvote(doc.id)}
-              aria-label={`${isUpvoted ? "Remove upvote from" : "Upvote"} ${doc.title}, ${displayCount} upvote${displayCount !== 1 ? "s" : ""}`}
-              aria-pressed={isUpvoted}
-              className={`motion-hover motion-active flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-bold ${isUpvoted ? "border-success bg-success/10 text-success hover:bg-success/20" : "border-border text-muted hover:border-success/50 hover:text-success"}`}
-            >
-              <ThumbsUp size={14} aria-hidden="true" className={isUpvoted ? "fill-success" : ""} />
-              {displayCount}
-            </button>
-          );
-        })()}
+        {onToggleUpvote ? (
+          <button
+            onClick={() => onToggleUpvote(doc.id)}
+            aria-label={`${isUpvoted ? "Remove upvote from" : "Upvote"} ${doc.title}, ${upvoteCount} upvote${upvoteCount !== 1 ? "s" : ""}`}
+            aria-pressed={isUpvoted}
+            className={`motion-hover motion-active flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-bold ${isUpvoted ? "border-success bg-success/10 text-success hover:bg-success/20" : "border-border text-muted hover:border-success/50 hover:text-success"}`}
+          >
+            <ThumbsUp size={14} aria-hidden="true" className={isUpvoted ? "fill-success" : ""} />
+            {upvoteCount}
+          </button>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-2 text-sm font-medium text-muted tabular-nums" aria-label={`${upvoteCount} upvote${upvoteCount !== 1 ? "s" : ""}`}>
+            <ThumbsUp size={14} aria-hidden="true" />
+            {upvoteCount}
+          </span>
+        )}
 
         {isAdmin && onDelete && (
           <button

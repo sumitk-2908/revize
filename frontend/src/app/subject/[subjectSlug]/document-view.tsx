@@ -2,12 +2,15 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { Metadata } from "next";
 import { supabase } from "@/app/lib/api/core";
+import { format } from "date-fns";
 import { subjectSlug as slugifySubject, documentPath, isModulelessDocument } from "@/components/layout/utils";
+import { normalizeTitle } from "@/app/lib/subject-config";
 import Breadcrumb from "@/components/ui/Breadcrumb";
 import { CommentSection } from "@/components/comments/CommentSection";
 import AiStudyTools from "@/components/subject/AiStudyTools";
 // Standard import of the wrapper component
 import PDFViewerWrapper from "@/components/pdf/PDFViewerWrapper";
+import { FileText, HardDrive, UserRound, CalendarDays, Layers3 } from "lucide-react";
 
 /**
  * The document page, shared by the two URL shapes that can address a document:
@@ -98,7 +101,7 @@ export async function documentMetadata(
 
   if (!doc) return { title: "Document Not Found" };
 
-  const subjectName = subjectSegment.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const subjectName = normalizeTitle(subjectSegment.replace(/-/g, " "));
   const canonicalPath = documentPath(subjectSegment, doc);
 
   return {
@@ -175,17 +178,46 @@ export default async function DocumentView({
       : null;
 
   // Use the wrapper to render the client logic
+  const analytics = Array.isArray(documentMeta.document_analytics)
+    ? documentMeta.document_analytics[0]
+    : documentMeta.document_analytics;
+  const uploadedDate = documentMeta.created_at
+    ? format(new Date(documentMeta.created_at), "MMM d, yyyy")
+    : null;
+  const fileSize = typeof documentMeta.file_size === "number"
+    ? `${(documentMeta.file_size / (1024 * 1024)).toFixed(1)} MB`
+    : null;
+
   return (
-    <div className="mx-auto flex max-w-[90rem] flex-col space-y-4">
+    <div className="mx-auto max-w-[90rem] space-y-4">
       <Breadcrumb />
-      <div className="flex flex-col gap-6">
-        <div className="w-full min-w-0">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
+        <div className="min-w-0 space-y-6">
           <PDFViewerWrapper documentMeta={documentMeta} />
-        </div>
-        <AiStudyTools documentId={documentMeta.id} summary={summary} />
-        <div className="w-full shrink-0">
+          <AiStudyTools documentId={documentMeta.id} summary={summary} />
           <CommentSection documentId={documentMeta.id} />
         </div>
+
+        <aside className="order-first lg:order-last lg:sticky lg:top-24" aria-label="Document metadata">
+          <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
+            <div className="mb-5 flex items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <FileText size={20} aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="line-clamp-3 text-base font-extrabold leading-snug text-foreground">{documentMeta.title}</h1>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-primary">{normalizeTitle(documentMeta.category || "document")}</p>
+              </div>
+            </div>
+            <dl className="space-y-4 border-t border-border pt-4 text-sm">
+              {documentMeta.uploader_name && <div className="flex gap-3"><UserRound size={15} className="mt-0.5 shrink-0 text-muted" /><div><dt className="text-xs font-semibold text-muted">Uploaded by</dt><dd className="font-bold text-foreground">{documentMeta.uploader_name}</dd></div></div>}
+              {uploadedDate && <div className="flex gap-3"><CalendarDays size={15} className="mt-0.5 shrink-0 text-muted" /><div><dt className="text-xs font-semibold text-muted">Added</dt><dd className="font-bold text-foreground">{uploadedDate}</dd></div></div>}
+              {fileSize && <div className="flex gap-3"><HardDrive size={15} className="mt-0.5 shrink-0 text-muted" /><div><dt className="text-xs font-semibold text-muted">File size</dt><dd className="font-bold text-foreground">{fileSize}</dd></div></div>}
+              {documentMeta.page_count && <div className="flex gap-3"><Layers3 size={15} className="mt-0.5 shrink-0 text-muted" /><div><dt className="text-xs font-semibold text-muted">Pages</dt><dd className="font-bold text-foreground">{documentMeta.page_count}</dd></div></div>}
+            </dl>
+            {analytics && <p className="mt-5 border-t border-border pt-4 text-xs font-semibold text-muted">{analytics.view_count || 0} views · {analytics.download_count || 0} downloads</p>}
+          </div>
+        </aside>
       </div>
     </div>
   );

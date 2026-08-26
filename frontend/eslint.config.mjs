@@ -12,6 +12,7 @@ const PROJECT_UTILITIES = [
   "ease-premium",
   "animate-fade-up",
   "pb-safe",
+  "sidebar-scroll",
 ];
 
 /**

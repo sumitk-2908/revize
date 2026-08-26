@@ -35,7 +35,7 @@ export default function FilterSortControls() {
       } else {
         params.delete(name);
       }
-      
+
       startTransition(() => {
         router.push(`${pathname}?${params.toString()}`);
       });
@@ -44,30 +44,32 @@ export default function FilterSortControls() {
   );
 
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
-        <Filter size={16} className="text-muted shrink-0 mr-1" />
-        {CATEGORIES.map((category) => {
-          const isActive = currentCategory === category.id;
-          return (
-            <button
-              key={category.id}
-              onClick={() => updateParams("category", category.id)}
-              className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-surface-hover text-muted hover:text-foreground"
-              }`}
-            >
-              {category.label}
-            </button>
-          );
-        })}
+    <div className="mb-3 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <div className="relative min-w-0 overflow-hidden">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 pr-2 hide-scrollbar">
+          <Filter size={15} className="mr-1 shrink-0 text-muted" />
+          {CATEGORIES.map((category) => {
+            const isActive = currentCategory === category.id;
+            return (
+              <button
+                key={category.id}
+                onClick={() => updateParams("category", category.id)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-surface-hover text-muted hover:text-foreground"
+                  }`}
+              >
+                {category.label}
+              </button>
+            );
+          })}
+        </div>
+        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent sm:hidden" />
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
-        <label htmlFor="sort-select" className="text-xs font-bold text-muted flex items-center gap-1.5">
-          <ArrowDownUp size={14} /> Sort by
+      <div className="flex shrink-0 items-center justify-end gap-2">
+        <label htmlFor="sort-select" className="flex items-center gap-1.5 text-xs font-bold text-muted">
+          <ArrowDownUp size={14} /> <span className="hidden sm:inline">Sort by</span>
         </label>
         <select
           id="sort-select"

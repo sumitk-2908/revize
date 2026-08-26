@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/app/lib/api/core";
 import { LandingHero } from "@/components/landing/LandingHero";
-import { TrendingCarousel } from "@/components/landing/TrendingCarousel";
 import SubjectGrid from "@/components/SubjectGrid";
 import { AnimatePresence, motion } from "framer-motion";
 import { Subject, Branch } from "@/app/lib/api/subjects";
@@ -12,11 +11,9 @@ interface HomeClientProps {
   initialSubjects: Subject[];
   counts: Record<string, number>;
   branches: Branch[];
-  globalStats: { subjects: number; modules: number; views: number; downloads: number };
-  trendingDocs: any[];
 }
 
-export default function HomeClient({ initialSubjects, counts, branches, globalStats, trendingDocs }: HomeClientProps) {
+export default function HomeClient({ initialSubjects, counts, branches }: HomeClientProps) {
   const [authStatus, setAuthStatus] = useState<"loading" | "authenticated" | "unauthenticated">("loading");
   const [firstName, setFirstName] = useState("");
   const [userFavs, setUserFavs] = useState<string[]>([]);
@@ -90,11 +87,10 @@ export default function HomeClient({ initialSubjects, counts, branches, globalSt
               Reserve space at the top. We show the LandingHero to prevent a blank page 
               while loading auth state, ensuring SSR/SEO bots see the public content. 
             */}
-            <LandingHero stats={globalStats} trendingDocs={trendingDocs} />
-            <TrendingCarousel documents={trendingDocs} />
+            <LandingHero />
           </motion.div>
         )}
-        
+
         {authStatus === "unauthenticated" && (
           <motion.div
             key="unauth"
@@ -103,8 +99,7 @@ export default function HomeClient({ initialSubjects, counts, branches, globalSt
             exit={{ opacity: 0, height: 0, overflow: "hidden" }}
             transition={{ duration: 0.3 }}
           >
-            <LandingHero stats={globalStats} trendingDocs={trendingDocs} />
-            <TrendingCarousel documents={trendingDocs} />
+            <LandingHero />
           </motion.div>
         )}
 
@@ -115,26 +110,22 @@ export default function HomeClient({ initialSubjects, counts, branches, globalSt
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            className="mb-10 pt-8 text-center"
+            className="mb-6 flex flex-wrap items-center justify-between gap-3 py-6"
           >
-            {firstName ? (
-              <div className="mb-3 flex justify-center">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-surface/50 px-3 py-1 text-sm font-semibold tracking-wide text-muted shadow-sm backdrop-blur-sm">
-                  <span className="animate-pulse text-xl leading-none">👋</span>
-                  Welcome back, {firstName}
-                </span>
-              </div>
-            ) : (
-              <div className="mb-3 h-8" />
-            )}
-            <h1 className="mb-4 text-4xl font-extrabold tracking-tight text-foreground">
-              Academic <span className="text-primary">Resource Hub</span>
-            </h1>
-
-            <p className="mx-auto mb-8 max-w-2xl px-4 text-muted">
-              Select a subject domain below to access modules, notes,
-              assignments, and previous year questions.
-            </p>
+            <div className="flex min-w-0 items-baseline gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                Academic <span className="text-primary">Resource Hub</span>
+              </h1>
+              {firstName && <span className="hidden text-sm text-muted sm:inline">· Welcome back, {firstName}</span>}
+            </div>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
+              aria-haspopup="dialog"
+              className="motion-hover motion-active inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-border bg-transparent px-3 text-sm font-semibold text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+            >
+              Search documents <span className="font-mono text-xs">⌘K</span>
+            </button>
           </motion.section>
         )}
       </AnimatePresence>

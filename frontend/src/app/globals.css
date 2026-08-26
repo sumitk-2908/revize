@@ -129,6 +129,15 @@ body {
   display: none;
 }
 
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -154,7 +163,6 @@ body {
 
   /* 2. Active State: Satisfying 'press' detent effect */
   .motion-active:active:not(:disabled) {
-    transform: scale(0.97);
     transition-duration: 150ms;
     transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
   }
@@ -172,17 +180,30 @@ body {
     animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
-  /* 5. Modals/Dialogs: Slightly longer timing for cognitive tracking */
+  /* 5. Modals/Dialogs: fade with a restrained spring-feel scale entrance */
   .motion-modal {
-    animation-duration: 300ms;
-    animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+    animation-duration: 200ms;
+    animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation-fill-mode: both;
+  }
+
+  .motion-modal-static {
+    animation-duration: 200ms;
+    animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation-fill-mode: both;
+  }
+
+  .motion-sidebar-sheet {
+    animation-duration: 250ms;
+    animation-timing-function: ease-out;
+    animation-fill-mode: both;
   }
 
   /* 6. Layout Shifts: Sidebars, panel sliding */
   .motion-sidebar {
     transition-property: width, transform, margin, padding, opacity, background-color, border-color;
-    transition-duration: 300ms;
-    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+    transition-duration: 250ms;
+    transition-timing-function: ease-out;
   }
 
   /* 7. Broad Surface Transition: hero bands and cards that restyle wholesale */
@@ -245,6 +266,48 @@ body {
   background-color: var(--muted);
 }
 
+/* Sidebar-only scrollbar; the sticky shell remains outside this scroll region. */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-indigo-400) 18%, transparent) transparent;
+}
+
+.sidebar-scroll:hover {
+  scrollbar-color: color-mix(in srgb, var(--color-indigo-400) 35%, transparent) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--color-indigo-400) 18%, transparent);
+  transition: background-color 150ms ease-out;
+}
+
+.sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-indigo-400) 35%, transparent);
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-indigo-400);
+}
+
+@media (pointer: coarse) {
+  .sidebar-scroll {
+    scrollbar-width: none;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Keeps fixed bottom bars clear of the iOS home indicator. */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -264,7 +327,9 @@ body {
 }
 
 .animate-fade-up {
-  animation: v0-fade-up 0.4s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation-duration: 200ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
 }
 
 /* ========================================= */
@@ -304,12 +369,14 @@ body {
   .animate-in {
     animation-name: radix-enter;
     animation-duration: 200ms;
+    animation-timing-function: ease-out;
     animation-fill-mode: both;
   }
 
   .animate-out {
     animation-name: radix-exit;
-    animation-duration: 150ms;
+    animation-duration: 200ms;
+    animation-timing-function: ease-out;
     animation-fill-mode: both;
   }
 
@@ -557,6 +624,96 @@ body {
 /* Respects the OS "Reduce Motion" setting.  */
 /* Must be last so it wins specificity.      */
 /* ========================================= */
+@keyframes sidebar-sheet-enter {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes sidebar-sheet-exit {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes modal-fade-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-fade-exit {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-content-enter {
+  from {
+    opacity: 0;
+    scale: 0.97;
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes modal-content-exit {
+  from {
+    opacity: 1;
+    scale: 1;
+  }
+
+  to {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .motion-active:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  .animate-fade-up {
+    animation-name: v0-fade-up;
+  }
+
+  .motion-modal-static {
+    animation-name: modal-fade-enter;
+  }
+
+  .motion-modal-static:is([role="dialog"], [role="alertdialog"]) {
+    animation-name: modal-content-enter;
+  }
+
+  .motion-sidebar-sheet[data-state="open"] {
+    animation-name: sidebar-sheet-enter;
+  }
+
+  .motion-sidebar-sheet[data-state="closed"] {
+    animation-name: sidebar-sheet-exit;
+  }
+
+  .motion-modal[data-state="open"] {
+    animation-name: modal-fade-enter;
+  }
+
+  .motion-modal[data-state="closed"] {
+    animation-name: modal-fade-exit;
+  }
+
+  .motion-modal:is([role="dialog"], [role="alertdialog"])[data-state="open"] {
+    animation-name: modal-content-enter;
+  }
+
+  .motion-modal:is([role="dialog"], [role="alertdialog"])[data-state="closed"] {
+    animation-name: modal-content-exit;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   *,
@@ -575,14 +732,23 @@ body {
 
   /* Radix Dialog/Popover/Toast: remove enter/exit motion entirely */
   .animate-in,
-  .animate-out {
+  .animate-out,
+  .motion-modal,
+  .motion-modal-static {
     animation: none !important;
+    transition: none !important;
+    scale: 1 !important;
   }
 
   /* Page-level fade-up entrance */
   .animate-fade-up {
     animation: none !important;
     opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .motion-sidebar-sheet {
+    animation: none !important;
     transform: none !important;
   }
 

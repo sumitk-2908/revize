@@ -107,7 +107,10 @@ export default function DocumentInteractiveGrid({
 
   const virtualizer = useWindowVirtualizer({
     count: hasNextPage ? rowCount + 1 : rowCount,
-    estimateSize: () => 380,
+    // The compact mobile card is shorter than the desktop card. Keeping this
+    // estimate close to the rendered height prevents excessive blank space
+    // between virtualized rows while preserving a little room for wrapping.
+    estimateSize: () => cols === 1 ? 330 : 380,
     overscan: 2,
   });
 

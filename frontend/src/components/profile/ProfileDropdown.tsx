@@ -91,9 +91,8 @@ export default function ProfileDropdown({
           aria-expanded={isOpen}
           aria-label="User menu"
           onClick={() => setIsOpen(!isOpen)}
-          className={`motion-hover motion-active flex size-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground ${
-            isOpen ? "ring-2 ring-primary ring-offset-2" : ""
-          }`}
+          className={`motion-hover motion-active flex size-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground ${isOpen ? "ring-2 ring-primary ring-offset-2" : ""
+            }`}
         >
           {initials}
         </button>
@@ -143,13 +142,13 @@ export default function ProfileDropdown({
 
       {/* Sign Out Confirmation Modal */}
       {isSignOutModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+        <div className="motion-modal-static fixed inset-0 z-[100] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+          <div role="dialog" aria-modal="true" className="motion-modal-static w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-2xl">
             <h2 className="mb-2 text-xl font-bold text-foreground">Sign Out</h2>
             <p className="mb-6 text-sm text-muted">
               Are you sure you want to sign out? You will need to log back in to access your study materials and contributions.
             </p>
-            
+
             <div className="flex w-full items-center gap-3">
               <button
                 onClick={() => setIsSignOutModalOpen(false)}

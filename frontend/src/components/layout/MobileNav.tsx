@@ -99,7 +99,7 @@ export const MobileNav = () => {
           <Dialog.Overlay className="motion-modal fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm lg:hidden" />
           <Dialog.Content
             aria-describedby={undefined}
-            className="motion-modal fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] w-full overflow-y-auto rounded-t-3xl border-t border-border bg-surface p-6 pb-28 shadow-2xl lg:hidden"
+            className="motion-sidebar-sheet fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] w-full overflow-y-auto rounded-t-3xl border-t border-border bg-surface p-6 pb-28 shadow-2xl lg:hidden"
           >
             <div className="mb-6 flex items-center justify-between">
               <Dialog.Title className="text-xl font-extrabold text-foreground">More Options</Dialog.Title>
@@ -168,8 +168,8 @@ export const MobileNav = () => {
       {/* ── Sign Out confirmation dialog ────────────────────── */}
       <Dialog.Root open={isSignOutModalOpen} onOpenChange={setIsSignOutModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm" />
-          <Dialog.Content className="fixed left-[50%] top-[50%] z-[101] w-full max-w-sm translate-x-[-50%] translate-y-[-50%] rounded-3xl border border-border bg-surface p-6 shadow-2xl">
+          <Dialog.Overlay className="motion-modal fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm" />
+          <Dialog.Content className="motion-modal fixed left-[50%] top-[50%] z-[101] w-full max-w-sm translate-x-[-50%] translate-y-[-50%] rounded-3xl border border-border bg-surface p-6 shadow-2xl">
             <Dialog.Title className="mb-2 text-lg font-extrabold text-foreground">Sign Out</Dialog.Title>
             <Dialog.Description className="mb-6 text-sm font-medium text-muted">
               Are you sure you want to sign out? You will need to sign back in to access your bookmarks and history.

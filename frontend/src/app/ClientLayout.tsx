@@ -1,7 +1,7 @@
 "use client";
 
 import { Providers } from "@/app/context/Providers";
-import { AppShell, ContentArea } from "@/components/layout/AppShell";
+import { AppShell, ContentArea, ShellContent } from "@/components/layout/AppShell";
 import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
@@ -18,10 +18,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <ErrorBoundary title="Fatal App Error" message="The application shell encountered a critical error. Please reload the page.">
         <AppShell>
           <TopBar />
-          <div className="mx-auto flex w-full max-w-[1600px] flex-1">
+          <ShellContent>
             <Sidebar />
             <ContentArea>{children}</ContentArea>
-          </div>
+          </ShellContent>
           <MobileNav />
           <AuthModal />
           <UploadModal />

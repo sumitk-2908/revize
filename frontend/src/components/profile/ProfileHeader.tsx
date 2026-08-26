@@ -84,7 +84,7 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
     const focusableElements = modalElement.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
-    
+
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
 
@@ -155,7 +155,7 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
           <p className="text-center text-sm font-semibold text-foreground sm:text-left">
             Complete your profile to unlock personalized recommendations and community recognition.
           </p>
-          <button 
+          <button
             onClick={() => setIsEditModalOpen(true)}
             className="motion-hover motion-active shrink-0 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90"
           >
@@ -178,56 +178,56 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
               <h1 className="text-xl font-extrabold tracking-tight text-foreground">{fullName || "Student"}</h1>
               {currentStreak > 0 && (
                 <div className="flex items-center gap-1 rounded-full bg-orange-500/10 px-2.5 py-0.5 text-xs font-bold text-orange-500 tabular-nums">
-                  <Flame size={12} fill="currentColor" aria-hidden="true"/>
+                  <Flame size={12} fill="currentColor" aria-hidden="true" />
                   {currentStreak} Day{currentStreak !== 1 ? 's' : ''}
                 </div>
               )}
             </div>
-            
+
             <p className="mb-3 text-sm font-medium text-muted">{email}</p>
             <div className="flex flex-wrap justify-center gap-3 text-sm font-medium text-muted sm:justify-start sm:gap-4">
-              <span className="flex items-center gap-1.5"><GraduationCap size={14} aria-hidden="true"/> {[branches.find(b => b.id === branchId)?.code, getYearLabel(year)].filter(Boolean).join(" · ") || "Academic Portal"}</span>
-              <span className="flex items-center gap-1.5"><BookOpen size={14} aria-hidden="true"/> Student Account</span>
+              <span className="flex items-center gap-1.5"><GraduationCap size={14} aria-hidden="true" /> {[branches.find(b => b.id === branchId)?.code, getYearLabel(year)].filter(Boolean).join(" · ") || "Academic Portal"}</span>
+              <span className="flex items-center gap-1.5"><BookOpen size={14} aria-hidden="true" /> Student Account</span>
             </div>
           </div>
-          <button 
+          <button
             ref={editButtonRef}
             onClick={() => setIsEditModalOpen(true)}
             className="motion-hover motion-active mt-3 flex w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-bold text-muted hover:bg-surface-hover sm:mt-0 sm:w-auto"
           >
-            <Edit size={14} aria-hidden="true"/> Edit Profile
+            <Edit size={14} aria-hidden="true" /> Edit Profile
           </button>
         </div>
       </div>
 
       {isEditModalOpen && (
-        <div className="motion-modal animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div 
+        <div className="motion-modal-static fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div
             ref={modalRef}
-            role="dialog" 
-            aria-modal="true" 
+            role="dialog"
+            aria-modal="true"
             aria-labelledby="edit-profile-title"
-            className="motion-modal w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl"
+            className="motion-modal-static w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl"
           >
             <div className="mb-6 flex items-center justify-between">
               <h2 id="edit-profile-title" className="text-xl font-bold tracking-tight text-foreground">Personalize Profile</h2>
-              <button 
+              <button
                 aria-label="Close modal"
-                onClick={() => setIsEditModalOpen(false)} 
+                onClick={() => setIsEditModalOpen(false)}
                 className="motion-hover text-muted hover:text-foreground"
               >
                 <X size={20} aria-hidden="true" />
               </button>
             </div>
-            
+
             <form onSubmit={handleSave}>
               <div className="mb-6 space-y-4">
                 <div>
                   <label htmlFor="nameInput" className="mb-2 block text-xs font-bold tracking-[0.06em] text-muted uppercase">Display Name</label>
-                  <input 
+                  <input
                     id="nameInput"
                     required
-                    type="text" 
+                    type="text"
                     placeholder="e.g. John Doe"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
@@ -266,8 +266,8 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
                   <div className="relative">
                     <div className="motion-focus flex items-center gap-2 rounded-xl border border-border bg-background p-2 focus-within:border-primary focus-within:bg-surface">
                       <Search size={16} className="ml-1 text-muted" />
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder={favoriteSubjects.length < 5 ? "Search subjects..." : "Maximum subjects reached"}
                         value={subjectQuery}
                         onChange={(e) => setSubjectQuery(e.target.value)}
@@ -314,14 +314,14 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
 
               <div className="flex justify-end gap-3">
                 <button type="button" onClick={() => setIsEditModalOpen(false)} className="motion-hover motion-active rounded-xl bg-surface-hover px-4 py-2 text-sm font-bold text-muted">Cancel</button>
-                <button 
+                <button
                   type="submit"
                   disabled={isSaving}
                   className="motion-hover motion-active flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50"
                 >
                   {isSaving ? (
                     <>
-                      <InlineSpinner label="Saving preferences" size={16} /> 
+                      <InlineSpinner label="Saving preferences" size={16} />
                       <span aria-live="polite">Saving preferences...</span>
                     </>
                   ) : (

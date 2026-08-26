@@ -3,9 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/app/lib/api/core";
-import { getTrendingDocuments } from "@/app/lib/api/analytics";
 import { searchDocuments } from "@/app/lib/api/documents";
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { dispatchToast as showToast } from "@/app/lib/toast";
 import { DocumentWithAnalytics } from "@/app/lib/document-types";
 
@@ -16,7 +14,6 @@ interface SidebarContextType {
   showMobileMenu: boolean;
   sidebarLoading: boolean;
   pendingCount: number;
-  trendingDocs: DocumentWithAnalytics[];
   searchQuery: string;
   globalSearchResults: DocumentWithAnalytics[];
   isSearching: boolean;
@@ -40,18 +37,12 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [globalSearchResults, setGlobalSearchResults] = useState<DocumentWithAnalytics[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const { data: trendingDocs = [] as DocumentWithAnalytics[] } = useQuery({
-    queryKey: ['trendingDocuments'],
-    queryFn: getTrendingDocuments,
-    placeholderData: keepPreviousData,
-  });
-
   const refreshSidebarData = useCallback(async () => {
     const { count } = await supabase
       .from('documents')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
-      
+
     if (count !== null) setPendingCount(count);
   }, []);
 
@@ -97,13 +88,13 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
       setGlobalSearchResults(response.data);
       setIsSearching(false);
     };
-    const debounceTimer = setTimeout(fetchSearchResults, 300); 
+    const debounceTimer = setTimeout(fetchSearchResults, 300);
     return () => clearTimeout(debounceTimer);
   }, [searchQuery]);
 
   return (
     <SidebarContext.Provider value={{
-      pathname, isOffline, sidebarCollapsed, showMobileMenu, sidebarLoading, pendingCount, trendingDocs, searchQuery, globalSearchResults, isSearching,
+      pathname, isOffline, sidebarCollapsed, showMobileMenu, sidebarLoading, pendingCount, searchQuery, globalSearchResults, isSearching,
       setSidebarCollapsed, setShowMobileMenu, setSearchQuery
     }}>
       {children}
