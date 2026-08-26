@@ -207,6 +207,20 @@ body {
   outline: 1px solid color-mix(in srgb, var(--primary) 70%, transparent);
 }
 
+.pdf-search-highlight-flash {
+  animation: pdf-search-highlight-flash 300ms ease-out;
+}
+
+@keyframes pdf-search-highlight-flash {
+  0% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 65%, transparent);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
 /* Slim, theme-aware scrollbar for panes that scroll inside a card. */
 .custom-scrollbar {
   scrollbar-width: thin;
@@ -271,9 +285,7 @@ body {
   from {
     opacity: var(--tw-enter-opacity, 1);
     transform:
-      translate(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0))
-      scale(var(--tw-enter-scale, 1))
-      rotate(var(--tw-enter-rotate, 0));
+      translate(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0)) scale(var(--tw-enter-scale, 1)) rotate(var(--tw-enter-rotate, 0));
   }
 }
 
@@ -281,9 +293,7 @@ body {
   to {
     opacity: var(--tw-exit-opacity, 1);
     transform:
-      translate(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0))
-      scale(var(--tw-exit-scale, 1))
-      rotate(var(--tw-exit-rotate, 0));
+      translate(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0)) scale(var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
   }
 }
 
@@ -305,61 +315,120 @@ body {
 
   /* --- Fade enter modifiers ----------------------------- */
 
-  .fade-in   { --tw-enter-opacity: 0; }
-  .fade-in-0 { --tw-enter-opacity: 0; }
+  .fade-in {
+    --tw-enter-opacity: 0;
+  }
+
+  .fade-in-0 {
+    --tw-enter-opacity: 0;
+  }
 
   /* --- Fade exit modifiers ------------------------------ */
 
-  .fade-out   { --tw-exit-opacity: 0; }
-  .fade-out-0 { --tw-exit-opacity: 0; }
+  .fade-out {
+    --tw-exit-opacity: 0;
+  }
+
+  .fade-out-0 {
+    --tw-exit-opacity: 0;
+  }
 
   /* --- Zoom enter modifiers ----------------------------- */
 
-  .zoom-in-90 { --tw-enter-scale: .90; }
-  .zoom-in-95 { --tw-enter-scale: .95; }
-  .zoom-in-100 { --tw-enter-scale: 1; }
+  .zoom-in-90 {
+    --tw-enter-scale: .90;
+  }
+
+  .zoom-in-95 {
+    --tw-enter-scale: .95;
+  }
+
+  .zoom-in-100 {
+    --tw-enter-scale: 1;
+  }
 
   /* --- Zoom exit modifiers ------------------------------ */
 
-  .zoom-out-90 { --tw-exit-scale: .90; }
-  .zoom-out-95 { --tw-exit-scale: .95; }
+  .zoom-out-90 {
+    --tw-exit-scale: .90;
+  }
+
+  .zoom-out-95 {
+    --tw-exit-scale: .95;
+  }
 
   /* --- Slide-in-from (enter translate) ------------------ */
 
   /* Top (positive Y goes down, so entering from top = negative) */
-  .slide-in-from-top-2  { --tw-enter-translate-y: -0.5rem; }
-  .slide-in-from-top-4  { --tw-enter-translate-y: -1rem; }
-  .slide-in-from-top-8  { --tw-enter-translate-y: -2rem; }
+  .slide-in-from-top-2 {
+    --tw-enter-translate-y: -0.5rem;
+  }
+
+  .slide-in-from-top-4 {
+    --tw-enter-translate-y: -1rem;
+  }
+
+  .slide-in-from-top-8 {
+    --tw-enter-translate-y: -2rem;
+  }
 
   /* Percentage-based top (for dialog centering) */
-  .slide-in-from-top-\[48\%\]  { --tw-enter-translate-y: -48%; }
+  .slide-in-from-top-\[48\%\] {
+    --tw-enter-translate-y: -48%;
+  }
 
   /* Left (positive X goes right, so entering from left = negative) */
-  .slide-in-from-left-1\/2    { --tw-enter-translate-x: -50%; }
-  .slide-in-from-left-\[50\%\] { --tw-enter-translate-x: -50%; }
+  .slide-in-from-left-1\/2 {
+    --tw-enter-translate-x: -50%;
+  }
+
+  .slide-in-from-left-\[50\%\] {
+    --tw-enter-translate-x: -50%;
+  }
 
   /* Bottom */
-  .slide-in-from-bottom-2 { --tw-enter-translate-y: 0.5rem; }
-  .slide-in-from-bottom-4 { --tw-enter-translate-y: 1rem; }
+  .slide-in-from-bottom-2 {
+    --tw-enter-translate-y: 0.5rem;
+  }
+
+  .slide-in-from-bottom-4 {
+    --tw-enter-translate-y: 1rem;
+  }
 
   /* Right */
-  .slide-in-from-right-2 { --tw-enter-translate-x: 0.5rem; }
+  .slide-in-from-right-2 {
+    --tw-enter-translate-x: 0.5rem;
+  }
 
   /* --- Slide-out-to (exit translate) -------------------- */
 
   /* Top */
-  .slide-out-to-top-4         { --tw-exit-translate-y: -1rem; }
-  .slide-out-to-top-\[48\%\]  { --tw-exit-translate-y: -48%; }
+  .slide-out-to-top-4 {
+    --tw-exit-translate-y: -1rem;
+  }
+
+  .slide-out-to-top-\[48\%\] {
+    --tw-exit-translate-y: -48%;
+  }
 
   /* Left */
-  .slide-out-to-left-1\/2     { --tw-exit-translate-x: -50%; }
-  .slide-out-to-left-\[50\%\] { --tw-exit-translate-x: -50%; }
+  .slide-out-to-left-1\/2 {
+    --tw-exit-translate-x: -50%;
+  }
+
+  .slide-out-to-left-\[50\%\] {
+    --tw-exit-translate-x: -50%;
+  }
 
   /* Bottom */
-  .slide-out-to-bottom-2 { --tw-exit-translate-y: 0.5rem; }
+  .slide-out-to-bottom-2 {
+    --tw-exit-translate-y: 0.5rem;
+  }
 
   /* Right */
-  .slide-out-to-right-full { --tw-exit-translate-x: 100%; }
+  .slide-out-to-right-full {
+    --tw-exit-translate-x: 100%;
+  }
 
   /* --- Radix Toast swipe-out animation ------------------ */
   /* Radix sets data-[swipe=end] when the user completes a swipe */
@@ -467,7 +536,7 @@ body {
   grid-template-rows: 1fr;
 }
 
-.study-collapse > * {
+.study-collapse>* {
   min-height: 0;
   overflow: hidden;
 }
@@ -489,6 +558,7 @@ body {
 /* Must be last so it wins specificity.      */
 /* ========================================= */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {

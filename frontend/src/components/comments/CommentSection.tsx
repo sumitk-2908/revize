@@ -99,16 +99,13 @@ export const CommentSection = ({ documentId }: CommentSectionProps) => {
   };
 
   return (
-    /* Height is deliberately content-driven: collapsed, this is just the header
-       bar. The page used to wrap it in a `calc(100vh - 6.5rem)` box, which
-       reserved a full screen of empty space even while collapsed. */
-    <div className="flex flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
       <button
         type="button"
         onClick={() => setIsDiscussionExpanded((expanded) => !expanded)}
         aria-expanded={isDiscussionExpanded}
         aria-controls="document-discussion-content"
-        className="motion-hover flex w-full shrink-0 items-center gap-2 bg-surface-hover px-4 py-3 text-left hover:bg-background sm:px-6"
+        className="motion-hover flex w-full shrink-0 items-center gap-3 bg-surface-hover/70 px-4 py-3 text-left hover:bg-background sm:px-6"
       >
         <MessageSquare size={18} className="text-primary" aria-hidden="true" />
         <span className="text-base font-extrabold tracking-tight text-foreground">Discussion</span>
@@ -139,14 +136,14 @@ export const CommentSection = ({ documentId }: CommentSectionProps) => {
             />
           </div>
 
-          <div className="px-4 py-4 sm:px-6">
+          <div className="px-3 py-4 sm:px-6">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-12 text-muted">
                 <Loader2 size={24} className="animate-spin mb-2" />
                 <span className="text-sm font-bold">Loading comments...</span>
               </div>
             ) : commentTree.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {commentTree.map(comment => (
                   <CommentItem
                     key={comment.id}

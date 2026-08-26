@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, type FormEvent, type ReactNode } from "react";
 import {
   ArrowLeft, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
-  Share2, Link as LinkIcon, Check, Maximize, Search, X,
-  ThumbsUp, ThumbsDown, Flag,
-  Download, File as FileIcon, FileText, FileSpreadsheet, Presentation
+  Share2, Link as LinkIcon, Check, Maximize, Minimize, Search, X,
+  ThumbsUp, Flag, BookOpen, List, Keyboard, Columns3, Map,
+  Download, File as FileIcon, FileText, FileSpreadsheet, Presentation,
+  PanelRight, ChevronDown
 } from "lucide-react";
 import { usePathname, useRouter } from 'next/navigation';
 import NextImage from "next/image";
@@ -15,6 +16,7 @@ import { triggerStreakUpdate } from "@/app/lib/api/profile";
 import { useLogStudySessionMutation, useUpdateReadingProgressMutation } from "@/app/hooks/useStudyHistory";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { Document, Page, pdfjs } from 'react-pdf';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -30,6 +32,22 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url,
 ).toString();
+
+const TOOLBAR_BUTTON = "motion-hover motion-active inline-flex size-8 shrink-0 items-center justify-center rounded-md text-zinc-300 outline-none hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-35 data-[state=open]:bg-white/10 data-[state=open]:text-white";
+
+function ToolTip({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Tooltip.Root delayDuration={350}>
+      <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content sideOffset={7} className="z-[120] rounded-md bg-zinc-950 px-2 py-1.5 text-xs font-semibold text-white shadow-xl ring-1 ring-white/10">
+          {label}
+          <Tooltip.Arrow className="fill-zinc-950" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
+}
 
 // Icon shown on the download-only card for file types with no in-app preview.
 const UNSUPPORTED_ICONS: Record<string, typeof FileIcon> = {
@@ -75,7 +93,16 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   const [pdfDocument, setPdfDocument] = useState<Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]> | null>(null);
   const [scale, setScale] = useState<number>(1.0);
   const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isOutlineOpen, setIsOutlineOpen] = useState(false);
+  const [isMinimapOpen, setIsMinimapOpen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [isAnnotationsOpen, setIsAnnotationsOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [pageJump, setPageJump] = useState("1");
   const containerRef = useRef<HTMLDivElement>(null);
+  const fullscreenRef = useRef<HTMLDivElement>(null);
+  const fullscreenTriggerRef = useRef<HTMLButtonElement>(null);
 
   // Natural aspect ratio of an image document, measured once it loads, so the
   // zoom box matches the image instead of guessing A4 like the PDF path does.
@@ -177,7 +204,12 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     };
     updateWidth();
     window.addEventListener("resize", updateWidth);
-    return () => window.removeEventListener("resize", updateWidth);
+    const observer = containerRef.current ? new ResizeObserver(updateWidth) : null;
+    if (containerRef.current && observer) observer.observe(containerRef.current);
+    return () => {
+      window.removeEventListener("resize", updateWidth);
+      observer?.disconnect();
+    };
   }, []);
 
   // .txt / .md are fetched and shown as plain text. They are stored with a
@@ -391,6 +423,10 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   }, [isPdf, saveProgress]);
 
   useEffect(() => {
+    setPageJump(String(currentPage));
+  }, [currentPage]);
+
+  useEffect(() => {
     const firstMatch = pdfSearch.matches[0];
     if (firstMatch) goToPage(firstMatch.pageNumber);
   }, [goToPage, pdfSearch.matches]);
@@ -399,11 +435,69 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     goToPage(currentPage + offset);
   }, [currentPage, goToPage]);
 
+  const commitPageJump = () => {
+    const requestedPage = Number.parseInt(pageJump, 10);
+    if (Number.isFinite(requestedPage)) goToPage(requestedPage);
+    else setPageJump(String(currentPage));
+  };
+
+  const submitPageJump = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    commitPageJump();
+  };
+
+  const exitFullscreen = useCallback(() => {
+    setIsFullscreen(false);
+    setIsOutlineOpen(false);
+    setIsMinimapOpen(false);
+    setIsShortcutsOpen(false);
+    requestAnimationFrame(() => fullscreenTriggerRef.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const focusableSelector = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    requestAnimationFrame(() => fullscreenRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus());
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        exitFullscreen();
+        return;
+      }
+      if (e.key === '?' && !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        setIsShortcutsOpen(open => !open);
+        return;
+      }
+      if (e.key === 'Tab' && fullscreenRef.current) {
+        const focusable = Array.from(fullscreenRef.current.querySelectorAll<HTMLElement>(focusableSelector));
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [exitFullscreen, isFullscreen]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && isPdf) {
         e.preventDefault();
-        searchInputRef.current?.focus();
+        setIsSearchOpen(true);
+        requestAnimationFrame(() => searchInputRef.current?.focus());
         return;
       }
 
@@ -420,7 +514,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
         if (canZoom) setScale(s => Math.min(s + 0.2, 2.5));
       } else if (e.key === '-') {
         if (canZoom) setScale(s => Math.max(s - 0.2, 0.6));
-      } else if (e.key === 'Escape') {
+      } else if (e.key === 'Escape' && !isFullscreen) {
         if (pdfSearch.query) {
           pdfSearch.setQuery('');
           searchInputRef.current?.blur();
@@ -431,7 +525,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [changePage, router, isPdf, canZoom, pdfSearch]);
+  }, [changePage, router, isPdf, canZoom, isFullscreen, pdfSearch]);
 
   const navigateSearch = useCallback((direction: 'next' | 'prev') => {
     const match = direction === 'next' ? pdfSearch.next() : pdfSearch.prev();
@@ -538,254 +632,238 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
     }
   };
 
+  const pageEntries = Array.from({ length: numPages }, (_, index) => index + 1);
+
   return (
-    <div className="flex h-[calc(100vh-6rem)] w-full flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
+    <div
+      ref={isFullscreen ? fullscreenRef : undefined}
+      role={isFullscreen ? "dialog" : undefined}
+      aria-modal={isFullscreen ? true : undefined}
+      aria-label={isFullscreen ? `Reading ${documentMeta.title}` : undefined}
+      className={isFullscreen
+        ? "fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-black/80 p-0 backdrop-blur-sm"
+        : "flex h-[calc(100vh-6rem)] w-full flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm"}
+    >
+      <div className={isFullscreen ? "m-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-surface shadow-2xl md:m-3" : "flex min-h-0 flex-1 flex-col overflow-hidden"}>
 
-      {/* 1. Header: w-full ensures it takes full width for flex distributions */}
-      <div className="flex min-h-[3.5rem] w-full shrink-0 flex-col justify-between gap-3 border-b border-border bg-surface-hover p-3 sm:flex-row sm:items-center sm:gap-4 sm:px-4 sm:py-2">
+        <Tooltip.Provider>
+          <header className="relative flex min-h-12 shrink-0 items-center gap-2 bg-zinc-900 px-2.5 py-2 text-white shadow-md">
+            <ToolTip label="Go back"><button aria-label="Go back" onClick={() => router.back()} className={TOOLBAR_BUTTON}><ArrowLeft size={17} /></button></ToolTip>
+            <div className="min-w-0 flex-1 px-1">
+              <h1 className="truncate text-center text-sm font-bold text-white">{documentMeta.title}</h1>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <ToolTip label={`Upvote${upvotesCount ? ` (${upvotesCount})` : ''}`}><button aria-label="Upvote document" onClick={handleToggleUpvote} className={`${TOOLBAR_BUTTON} ${userRating === true ? 'text-emerald-400' : ''}`}><ThumbsUp size={16} className={userRating === true ? 'fill-current' : ''} /></button></ToolTip>
+              <ToolTip label="Report issue"><button aria-label="Report issue" onClick={() => setIsFlagModalOpen(true)} className={TOOLBAR_BUTTON}><Flag size={16} /></button></ToolTip>
+              <DropdownMenu.Root>
+                <ToolTip label="Share"><DropdownMenu.Trigger asChild><button aria-label="Share document" className={TOOLBAR_BUTTON}><Share2 size={16} /></button></DropdownMenu.Trigger></ToolTip>
+                <DropdownMenu.Portal><DropdownMenu.Content className="z-50 min-w-36 overflow-hidden rounded-lg bg-zinc-900 p-1 shadow-xl ring-1 ring-white/10" align="end" sideOffset={6}>
+                  <DropdownMenu.Item onClick={handleCopyLink} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">{copied ? <Check size={14} className="text-emerald-400" /> : <LinkIcon size={14} />}{copied ? 'Copied' : 'Copy link'}</DropdownMenu.Item>
+                  <DropdownMenu.Item onClick={handleWhatsAppShare} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-emerald-400 outline-none hover:bg-white/10">WhatsApp</DropdownMenu.Item>
+                </DropdownMenu.Content></DropdownMenu.Portal>
+              </DropdownMenu.Root>
+              {canZoom ? <ToolTip label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}><button ref={fullscreenTriggerRef} aria-label={isFullscreen ? "Exit fullscreen reader" : "Open in fullscreen reader"} onClick={() => isFullscreen ? exitFullscreen() : setIsFullscreen(true)} className={`${TOOLBAR_BUTTON} text-indigo-300`}>{isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}</button></ToolTip> : <ToolTip label="Open file"><a aria-label="Open file" href={documentMeta.file_url} target="_blank" rel="noopener noreferrer" onClick={handleOpenFile} className={`${TOOLBAR_BUTTON} text-indigo-300`}><Maximize size={16} /></a></ToolTip>}
+            </div>
+          </header>
 
-        <button onClick={() => router.back()} className="motion-hover motion-active flex shrink-0 items-center gap-1.5 self-start rounded-xl px-2 py-1.5 text-sm font-bold text-muted hover:bg-surface-hover sm:gap-2 sm:self-auto sm:px-3">
-          <ArrowLeft size={16} /> <span className="hidden sm:inline">Go Back</span><span className="sm:hidden">Back</span>
-        </button>
+          {canZoom && <div className="flex shrink-0 items-center justify-center gap-1 bg-zinc-950 px-2 py-1.5 text-zinc-200 shadow-inner">
+            <ToolTip label="Zoom out"><button aria-label="Zoom Out" onClick={() => setScale(s => Math.max(s - 0.2, 0.6))} className={TOOLBAR_BUTTON}><ZoomOut size={17} /></button></ToolTip>
+            <ToolTip label="Zoom presets"><DropdownMenu.Root><DropdownMenu.Trigger asChild><button aria-label="Zoom preset" className="motion-hover flex h-8 min-w-16 items-center justify-center gap-1 rounded-md px-2 text-xs font-bold tabular-nums text-zinc-200 hover:bg-white/10"><span>{Math.round(scale * 100)}%</span><ChevronDown size={13} /></button></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content className="z-50 min-w-28 rounded-lg bg-zinc-900 p-1 shadow-xl ring-1 ring-white/10" align="center" sideOffset={5}>{[0.75, 1, 1.25, 1.5, 2].map(preset => <DropdownMenu.Item key={preset} onClick={() => setScale(preset)} className="cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">{Math.round(preset * 100)}%</DropdownMenu.Item>)}</DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root></ToolTip>
+            <ToolTip label="Zoom in"><button aria-label="Zoom In" onClick={() => setScale(s => Math.min(s + 0.2, 2.5))} className={TOOLBAR_BUTTON}><ZoomIn size={17} /></button></ToolTip>
+            {isPdf && <><div className="mx-1 h-5 w-px bg-white/10" /><ToolTip label={isSearchOpen ? "Close search" : "Search document"}><button aria-label={isSearchOpen ? "Close document search" : "Open document search"} onClick={() => setIsSearchOpen(open => !open)} className={`${TOOLBAR_BUTTON} ${isSearchOpen ? 'bg-white/10 text-white' : ''}`}><Search size={16} /></button></ToolTip>{isSearchOpen && <div className="flex items-center gap-1"><input ref={searchInputRef} autoFocus aria-label="Search document text" value={pdfSearch.query} onChange={(event) => pdfSearch.setQuery(event.target.value)} placeholder="Search" className="motion-focus h-8 w-28 rounded-md border-0 bg-white/10 px-2 text-xs text-white outline-none placeholder:text-zinc-500 sm:w-40" /><span aria-live="polite" className="w-10 text-center text-[10px] tabular-nums text-zinc-400">{pdfSearch.isSearching ? '…' : pdfSearch.query ? `${pdfSearch.matches.length ? pdfSearch.activeIndex + 1 : 0}/${pdfSearch.matches.length}` : ''}</span>{pdfSearch.query && <button aria-label="Clear document search" onClick={() => pdfSearch.setQuery('')} className={TOOLBAR_BUTTON}><X size={14} /></button>}<button aria-label="Previous search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('prev')} className={TOOLBAR_BUTTON}><ChevronLeft size={15} /></button><button aria-label="Next search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('next')} className={TOOLBAR_BUTTON}><ChevronRight size={15} /></button></div>}</>}
+            {isPdf && <><div className="mx-1 h-5 w-px bg-white/10" /><ToolTip label="Previous page"><button aria-label="Previous Page" onClick={() => changePage(-1)} disabled={currentPage <= 1} className={TOOLBAR_BUTTON}><ChevronLeft size={17} /></button></ToolTip><form onSubmit={submitPageJump} className="flex items-center"><input aria-label="Jump to page" value={pageJump} onChange={event => setPageJump(event.target.value.replace(/[^0-9]/g, ''))} onBlur={commitPageJump} className="h-8 w-10 rounded-md border-0 bg-white/10 text-center text-xs font-bold tabular-nums text-white outline-none focus:bg-white/20" /><span className="px-1 text-xs text-zinc-500">/ {numPages || '—'}</span></form><ToolTip label="Next page"><button aria-label="Next Page" onClick={() => changePage(1)} disabled={currentPage >= numPages} className={TOOLBAR_BUTTON}><ChevronRight size={17} /></button></ToolTip></>}
+          </div>}
 
-        {/* 2. Text Container: items-center and text-center applied universally */}
-        <div className="flex w-full min-w-0 flex-1 flex-col items-center justify-center px-1 sm:px-4">
-          <h1 className="w-full text-center text-base leading-tight font-extrabold break-words whitespace-normal text-foreground sm:text-sm">
-            {documentMeta.title}
-          </h1>
-          <p className="mt-1 w-full text-center text-sm leading-tight font-semibold break-words whitespace-normal text-primary">
-            Uploaded by {documentMeta.uploader_name || 'Anonymous'}
-          </p>
-        </div>
+          {isPdf && <div className="h-0.5 shrink-0 bg-zinc-800" aria-label="Reading progress"><div className="h-full bg-indigo-400 transition-[width] duration-300" style={{ width: `${numPages ? (currentPage / numPages) * 100 : 0}%` }} /></div>}
+        </Tooltip.Provider>
 
-        {/* 3. Action Icons: Labels added for Report and Share to fill space evenly */}
-        <div className="mt-2 flex w-full shrink-0 items-center justify-between gap-1 text-muted sm:mt-0 sm:w-auto sm:justify-end sm:gap-2">
+        {isFullscreen && (
+          <>
+            <nav aria-label="Document breadcrumb" className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-border bg-surface px-4 py-2 text-xs font-semibold text-muted">
+              <BookOpen size={14} aria-hidden="true" />
+              <span>Documents</span><span aria-hidden="true">/</span><span className="truncate text-foreground">{documentMeta.title}</span>
+            </nav>
+            <div className="flex shrink-0 items-center justify-end gap-1 bg-zinc-900 px-3 py-1">
+              <button aria-pressed={isMinimapOpen} aria-label="Toggle minimap" onClick={() => setIsMinimapOpen(open => !open)} className="motion-hover rounded-md p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><Map size={16} /></button>
+              <button aria-pressed={isOutlineOpen} aria-label="Toggle document outline" onClick={() => { setIsOutlineOpen(open => !open); setIsAnnotationsOpen(false); }} className="motion-hover rounded-md p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><List size={16} /></button>
+              <button aria-label="Split view (coming soon)" disabled className="motion-hover rounded-lg p-2 text-muted opacity-50"><Columns3 size={16} /></button>
+              <button aria-pressed={isShortcutsOpen} aria-label="Show keyboard shortcuts" onClick={() => setIsShortcutsOpen(open => !open)} className="motion-hover rounded-lg p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><Keyboard size={16} /></button>
+              <button aria-label="Exit fullscreen reader" onClick={exitFullscreen} className="motion-hover rounded-lg p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><Minimize size={16} /></button>
+            </div>
+          </>
+        )}
 
-          <div className="flex shrink-0 items-center gap-1 border-r border-border pr-2 sm:mr-2 sm:pr-3">
-            <button onClick={handleToggleUpvote} className={`motion-hover motion-active flex items-center gap-1.5 rounded-lg p-1.5 font-bold ${userRating === true ? 'bg-success/10 text-success' : 'text-muted hover:bg-success/10 hover:text-success'}`}>
-              <ThumbsUp size={16} className={userRating === true ? 'fill-current' : ''} />
-              <span className="text-sm">{upvotesCount}</span>
+        {resumedAt !== null && (
+          <div role="status" className="flex shrink-0 flex-wrap items-center justify-center gap-1 border-b border-border bg-primary/5 px-4 py-2">
+            <span className="text-sm font-semibold text-foreground tabular-nums">
+              Picked up where you left off — page {resumedAt}
+            </span>
+            <button
+              onClick={() => { setResumedAt(null); goToPage(1); }}
+              className="motion-hover motion-active rounded-lg px-2 py-1 text-sm font-bold text-primary hover:bg-primary/10"
+            >
+              Back to page 1
+            </button>
+            <button
+              aria-label="Dismiss resume notice"
+              onClick={() => setResumedAt(null)}
+              className="motion-hover rounded-lg p-1 text-muted hover:bg-surface-hover hover:text-foreground"
+            >
+              <X size={14} aria-hidden="true" />
             </button>
           </div>
+        )}
 
-          <button onClick={() => setIsFlagModalOpen(true)} className="motion-hover motion-active flex shrink-0 items-center gap-1.5 rounded-lg p-1.5 text-muted hover:bg-destructive/10 hover:text-destructive sm:mr-1">
-            <Flag size={16} /> <span className="text-sm font-bold">Report</span>
-          </button>
-
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger asChild>
-              <button className="motion-hover motion-active flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-foreground hover:bg-surface-hover sm:px-3">
-                <Share2 size={14} /> <span className="text-sm font-bold">Share</span>
-              </button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content className="animate-in fade-in zoom-in-95 motion-dropdown z-50 min-w-[160px] overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-lg" align="end" sideOffset={5}>
-                <DropdownMenu.Item onClick={handleCopyLink} className="motion-hover flex cursor-pointer items-center gap-2 rounded-lg p-2 text-sm font-semibold text-foreground outline-none hover:bg-surface-hover">
-                  {copied ? <Check size={14} className="text-success" /> : <LinkIcon size={14} />}
-                  {copied ? 'Copied!' : 'Copy Link'}
-                </DropdownMenu.Item>
-                <DropdownMenu.Item onClick={handleWhatsAppShare} className="motion-hover flex cursor-pointer items-center gap-2 rounded-lg p-2 text-sm font-semibold text-success outline-none hover:bg-success/10">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1  8 8v.5z" /></svg>
-                  WhatsApp
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
-
-          <a href={documentMeta.file_url} target="_blank" rel="noopener noreferrer" onClick={handleOpenFile} className="motion-hover motion-active flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-bold text-primary hover:bg-primary/10 sm:px-3">
-            <span className="hidden sm:inline">{canZoom ? "FullScreen" : "Open"}</span> <Maximize size={14} />
-          </a>
-        </div>
-      </div>
-
-      {canZoom && (
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2">
-          <div className="flex items-center gap-1">
-            <button aria-label="Zoom Out" onClick={() => setScale(s => Math.max(s - 0.2, 0.6))} className="motion-hover motion-active rounded-lg p-1.5 text-muted hover:bg-surface-hover"><ZoomOut size={18} aria-hidden="true" /></button>
-            <span className="w-10 text-center text-sm font-bold text-foreground tabular-nums" aria-hidden="true">{Math.round(scale * 100)}%</span>
-            <button aria-label="Zoom In" onClick={() => setScale(s => Math.min(s + 0.2, 2.5))} className="motion-hover motion-active rounded-lg p-1.5 text-muted hover:bg-surface-hover"><ZoomIn size={18} aria-hidden="true" /></button>
-          </div>
-
-          {isPdf && (
-            <div className="flex min-w-0 flex-1 items-center justify-center gap-1 sm:order-2 sm:flex-none">
-              <Search size={16} className="shrink-0 text-muted" aria-hidden="true" />
-              <input
-                ref={searchInputRef}
-                aria-label="Search document text"
-                value={pdfSearch.query}
-                onChange={(event) => pdfSearch.setQuery(event.target.value)}
-                placeholder="Search in document"
-                className="motion-focus min-w-0 w-32 rounded-lg border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary sm:w-44"
-              />
-              <span aria-live="polite" className="w-16 shrink-0 text-center text-xs font-semibold text-muted tabular-nums">
-                {pdfSearch.isSearching ? 'Searching…' : pdfSearch.query ? `${pdfSearch.matches.length ? pdfSearch.activeIndex + 1 : 0}/${pdfSearch.matches.length}` : ''}
-              </span>
-              {pdfSearch.query && <button aria-label="Clear document search" onClick={() => pdfSearch.setQuery('')} className="motion-hover rounded-lg p-1 text-muted hover:bg-surface-hover hover:text-foreground"><X size={15} /></button>}
-              <button aria-label="Previous search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('prev')} className="motion-hover rounded-lg p-1 text-muted hover:bg-surface-hover disabled:opacity-40"><ChevronLeft size={16} /></button>
-              <button aria-label="Next search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('next')} className="motion-hover rounded-lg p-1 text-muted hover:bg-surface-hover disabled:opacity-40"><ChevronRight size={16} /></button>
-            </div>
-          )}
-
-          {isPdf ? (
-            <>
-              <div className="flex items-center gap-2">
-                <button aria-label="Previous Page" onClick={() => changePage(-1)} disabled={currentPage <= 1} className="motion-hover motion-active flex items-center justify-center rounded-lg bg-surface-hover p-1.5 text-foreground disabled:opacity-50"><ChevronLeft size={18} aria-hidden="true" /></button>
-                <span className="text-sm font-bold text-muted tabular-nums" aria-hidden="true">Page {currentPage} of {numPages || '--'}</span>
-                <button aria-label="Next Page" onClick={() => changePage(1)} disabled={currentPage >= numPages} className="motion-hover motion-active flex items-center justify-center rounded-lg bg-surface-hover p-1.5 text-foreground disabled:opacity-50"><ChevronRight size={18} aria-hidden="true" /></button>
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {(isAnnotationsOpen || (isFullscreen && isOutlineOpen)) && (
+            <aside aria-label={isAnnotationsOpen ? "Annotations sidebar" : "Document outline"} className="custom-scrollbar hidden w-60 shrink-0 overflow-auto bg-surface p-4 md:block">
+              <div className="mb-3 flex items-center gap-2 text-sm font-extrabold text-foreground">{isAnnotationsOpen ? <PanelRight size={15} /> : <List size={15} />} {isAnnotationsOpen ? "Annotations" : "Outline"}</div>
+              <p className="text-xs leading-relaxed text-muted">{isAnnotationsOpen ? "PDF annotations and page links" : "Page navigation"}</p>
+              <div className="mt-3 space-y-1">
+                {pageEntries.map(page => <button key={page} onClick={() => goToPage(page)} className="block w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold text-muted hover:bg-surface-hover hover:text-foreground">{isAnnotationsOpen ? `Page ${page} annotations` : `Page ${page}`}</button>)}
               </div>
-              {/* ARIA Live region for screen readers to announce page changes */}
-              <div aria-live="polite" aria-atomic="true" className="sr-only">
-                {numPages > 0 ? `Page ${currentPage} of ${numPages}` : 'Loading PDF'}
-              </div>
-            </>
-          ) : (
-            <span className="text-sm font-bold tracking-wider text-muted uppercase">{fileLabel}</span>
+            </aside>
           )}
-        </div>
-      )}
-
-      {resumedAt !== null && (
-        <div role="status" className="flex shrink-0 flex-wrap items-center justify-center gap-1 border-b border-border bg-primary/5 px-4 py-2">
-          <span className="text-sm font-semibold text-foreground tabular-nums">
-            Picked up where you left off — page {resumedAt}
-          </span>
-          <button
-            onClick={() => { setResumedAt(null); goToPage(1); }}
-            className="motion-hover motion-active rounded-lg px-2 py-1 text-sm font-bold text-primary hover:bg-primary/10"
-          >
-            Back to page 1
-          </button>
-          <button
-            aria-label="Dismiss resume notice"
-            onClick={() => setResumedAt(null)}
-            className="motion-hover rounded-lg p-1 text-muted hover:bg-surface-hover hover:text-foreground"
-          >
-            <X size={14} aria-hidden="true" />
-          </button>
-        </div>
-      )}
-
-      <div ref={containerRef} className="custom-scrollbar flex flex-1 justify-center overflow-auto bg-surface-hover p-4">
-        {isPdf && (
-          <Document file={documentMeta.file_url} onLoadSuccess={onDocumentLoadSuccess} loading={<Loader2 className="mt-10 animate-spin text-primary" size={32} />} error={<p className="mt-10 text-xs text-destructive">Failed to load PDF. The file could not be fetched from storage.</p>}>
-            {containerWidth > 0 && numPages > 0 && (
-              <div
-                style={{
-                  height: `${rowVirtualizer.getTotalSize()}px`,
-                  width: `${containerWidth * 0.95}px`,
-                  position: 'relative',
-                }}
-              >
-                {virtualItems.map((virtualRow) => (
+          <div ref={containerRef} className="custom-scrollbar flex min-w-0 flex-1 justify-center overflow-auto bg-surface-hover p-4">
+            {isPdf && (
+              <Document file={documentMeta.file_url} onLoadSuccess={onDocumentLoadSuccess} loading={<Loader2 className="mt-10 animate-spin text-primary" size={32} />} error={<p className="mt-10 text-xs text-destructive">Failed to load PDF. The file could not be fetched from storage.</p>}>
+                {containerWidth > 0 && numPages > 0 && (
                   <div
-                    key={virtualRow.index}
-                    /* measureElement reads data-index and reports the row's real
-                       height back, so scrollToIndex works on PDFs whose pages
-                       aren't A4 and at zoom levels the estimate can't predict.
-                       No fixed height here on purpose — that's what gets measured. */
-                    data-index={virtualRow.index}
-                    ref={rowVirtualizer.measureElement}
                     style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualRow.start}px)`,
-                      display: 'flex',
-                      justifyContent: 'center',
+                      height: `${rowVirtualizer.getTotalSize()}px`,
+                      width: `${containerWidth * 0.95}px`,
+                      position: 'relative',
                     }}
                   >
-                    <div className="mb-4 shadow-lg ring-1 ring-foreground/5 h-fit">
-                      <Page
-                        pageNumber={virtualRow.index + 1}
-                        scale={scale}
-                        width={containerWidth * 0.95}
-                        renderTextLayer={true}
-                        customTextRenderer={({ pageNumber, itemIndex, str }) => pdfSearch.getTextRenderer(pageNumber, itemIndex, str)}
-                        renderAnnotationLayer={true}
-                        loading={<SkeletonBlock className="h-[500px] w-full rounded-none" />}
-                      />
-                    </div>
+                    {virtualItems.map((virtualRow) => (
+                      <div
+                        key={virtualRow.index}
+                        /* measureElement reads data-index and reports the row's real
+                           height back, so scrollToIndex works on PDFs whose pages
+                           aren't A4 and at zoom levels the estimate can't predict.
+                           No fixed height here on purpose — that's what gets measured. */
+                        data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualRow.start}px)`,
+                          display: 'flex',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <div className="mb-4 shadow-lg ring-1 ring-foreground/5 h-fit">
+                          <Page
+                            pageNumber={virtualRow.index + 1}
+                            scale={scale}
+                            width={containerWidth * 0.95}
+                            renderTextLayer={true}
+                            customTextRenderer={({ pageNumber, itemIndex, str }) => pdfSearch.getTextRenderer(pageNumber, itemIndex, str)}
+                            renderAnnotationLayer={true}
+                            loading={<SkeletonBlock className="h-[500px] w-full rounded-none" />}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </Document>
             )}
-          </Document>
-        )}
 
-        {fileKind === "image" && containerWidth > 0 && (
-          <div
-            className="relative mb-4 bg-white shadow-lg ring-1 ring-foreground/5"
-            style={{
-              width: `${containerWidth * 0.95 * scale}px`,
-              height: `${(containerWidth * 0.95 * scale) / imageRatio}px`,
-            }}
-          >
-            {/* `fill` is the documented pattern for images of unknown dimensions;
+            {fileKind === "image" && containerWidth > 0 && (
+              <div
+                className="relative mb-4 bg-white shadow-lg ring-1 ring-foreground/5"
+                style={{
+                  width: `${containerWidth * 0.95 * scale}px`,
+                  height: `${(containerWidth * 0.95 * scale) / imageRatio}px`,
+                }}
+              >
+                {/* `fill` is the documented pattern for images of unknown dimensions;
                 `unoptimized` keeps the original bytes so zooming stays legible
                 and the server never re-encodes a scanned page on demand. */}
-            <NextImage
-              src={documentMeta.file_url}
-              alt={documentMeta.title || "Uploaded image"}
-              fill
-              unoptimized
-              sizes="95vw"
-              style={{ objectFit: "contain" }}
-              onLoad={(e) => {
-                const img = e.currentTarget;
-                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                  setImageRatio(img.naturalWidth / img.naturalHeight);
-                }
-              }}
-            />
-          </div>
-        )}
+                <NextImage
+                  src={documentMeta.file_url}
+                  alt={documentMeta.title || "Uploaded image"}
+                  fill
+                  unoptimized
+                  sizes="95vw"
+                  style={{ objectFit: "contain" }}
+                  onLoad={(e) => {
+                    const img = e.currentTarget;
+                    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                      setImageRatio(img.naturalWidth / img.naturalHeight);
+                    }
+                  }}
+                />
+              </div>
+            )}
 
-        {fileKind === "text" && (
-          <div className="w-full max-w-3xl">
-            {textError ? (
-              <p className="mt-10 text-center text-xs text-destructive">
-                Failed to load this file. It could not be fetched from storage.
-              </p>
-            ) : textContent === null ? (
-              <div className="flex justify-center"><Loader2 className="mt-10 animate-spin text-primary" size={32} /></div>
-            ) : (
-              <pre className="custom-scrollbar overflow-x-auto rounded-2xl border border-border bg-surface p-5 font-mono text-sm leading-relaxed whitespace-pre-wrap text-foreground shadow-lg">
-                {textContent}
-              </pre>
+            {fileKind === "text" && (
+              <div className="w-full max-w-3xl">
+                {textError ? (
+                  <p className="mt-10 text-center text-xs text-destructive">
+                    Failed to load this file. It could not be fetched from storage.
+                  </p>
+                ) : textContent === null ? (
+                  <div className="flex justify-center"><Loader2 className="mt-10 animate-spin text-primary" size={32} /></div>
+                ) : (
+                  <pre className="custom-scrollbar overflow-x-auto rounded-2xl border border-border bg-surface p-5 font-mono text-sm leading-relaxed whitespace-pre-wrap text-foreground shadow-lg">
+                    {textContent}
+                  </pre>
+                )}
+              </div>
+            )}
+
+            {(fileKind === "office" || fileKind === "unknown") && (
+              <div className="flex w-full max-w-md flex-col items-center justify-center gap-4 self-center rounded-2xl border border-border bg-surface p-8 text-center shadow-lg">
+                {(() => {
+                  const Icon = UNSUPPORTED_ICONS[getExtension(documentMeta.file_url)] ?? FileIcon;
+                  return <Icon size={48} className="text-primary" aria-hidden="true" />;
+                })()}
+                <div>
+                  <p className="text-base font-extrabold text-foreground">Preview isn&apos;t available for this file type</p>
+                  <p className="mt-1 text-sm text-muted">
+                    {fileLabel} files open in the app you use for them. Download a copy or open it in a new tab.
+                  </p>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+                  <a
+                    href={buildDownloadHref(documentMeta.file_url, documentMeta.title)}
+                    onClick={handleDownloadClick}
+                    className="motion-hover motion-active flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:opacity-90"
+                  >
+                    <Download size={16} aria-hidden="true" /> Download
+                  </a>
+                  <a
+                    href={documentMeta.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="motion-hover motion-active flex items-center gap-2 rounded-xl bg-surface-hover px-4 py-2.5 text-sm font-bold text-foreground"
+                  >
+                    <Maximize size={16} aria-hidden="true" /> Open in new tab
+                  </a>
+                </div>
+              </div>
             )}
           </div>
-        )}
+          {isFullscreen && isMinimapOpen && isPdf && (
+            <aside aria-label="Document minimap" className="custom-scrollbar hidden w-24 shrink-0 overflow-auto bg-surface p-2 lg:block">
+              <div className="mb-2 flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-muted"><Map size={12} /> Map</div>
+              <div className="space-y-1">
+                {pageEntries.map(page => <button key={page} aria-label={`Go to page ${page}`} onClick={() => goToPage(page)} className="flex h-8 w-full items-center justify-center rounded border border-border bg-surface-hover text-[10px] font-bold text-muted hover:border-primary hover:text-primary">{page}</button>)}
+              </div>
+            </aside>
+          )}
+        </div>
 
-        {(fileKind === "office" || fileKind === "unknown") && (
-          <div className="flex w-full max-w-md flex-col items-center justify-center gap-4 self-center rounded-2xl border border-border bg-surface p-8 text-center shadow-lg">
-            {(() => {
-              const Icon = UNSUPPORTED_ICONS[getExtension(documentMeta.file_url)] ?? FileIcon;
-              return <Icon size={48} className="text-primary" aria-hidden="true" />;
-            })()}
-            <div>
-              <p className="text-base font-extrabold text-foreground">Preview isn&apos;t available for this file type</p>
-              <p className="mt-1 text-sm text-muted">
-                {fileLabel} files open in the app you use for them. Download a copy or open it in a new tab.
-              </p>
-            </div>
-            <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
-              <a
-                href={buildDownloadHref(documentMeta.file_url, documentMeta.title)}
-                onClick={handleDownloadClick}
-                className="motion-hover motion-active flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:opacity-90"
-              >
-                <Download size={16} aria-hidden="true" /> Download
-              </a>
-              <a
-                href={documentMeta.file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="motion-hover motion-active flex items-center gap-2 rounded-xl bg-surface-hover px-4 py-2.5 text-sm font-bold text-foreground"
-              >
-                <Maximize size={16} aria-hidden="true" /> Open in new tab
-              </a>
-            </div>
+        {isFullscreen && isShortcutsOpen && (
+          <div role="status" className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
+            <section aria-label="Keyboard shortcuts" className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl">
+              <div className="mb-4 flex items-center justify-between"><h2 className="flex items-center gap-2 font-extrabold text-foreground"><Keyboard size={17} /> Keyboard shortcuts</h2><button aria-label="Close keyboard shortcuts" onClick={() => setIsShortcutsOpen(false)} className="rounded-lg p-1 text-muted hover:bg-surface-hover"><X size={17} /></button></div>
+              <dl className="space-y-3 text-sm"><div className="flex justify-between gap-4"><dt className="text-muted">Show shortcuts</dt><dd className="font-bold text-foreground">?</dd></div><div className="flex justify-between gap-4"><dt className="text-muted">Exit fullscreen</dt><dd className="font-bold text-foreground">Esc</dd></div><div className="flex justify-between gap-4"><dt className="text-muted">Next / previous page</dt><dd className="font-bold text-foreground">← / →</dd></div><div className="flex justify-between gap-4"><dt className="text-muted">Zoom</dt><dd className="font-bold text-foreground">+ / −</dd></div></dl>
+            </section>
           </div>
         )}
       </div>

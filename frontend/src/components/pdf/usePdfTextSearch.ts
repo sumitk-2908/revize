@@ -150,6 +150,7 @@ export function usePdfTextSearch(pdf: PDFDocumentProxy | null) {
                 start: Math.max(match.start, itemStart) - itemStart,
                 end: Math.min(match.end, itemEnd) - itemStart,
                 active: matchIndex === activeIndex,
+                matchIndex,
             }];
         });
         if (ranges.length === 0) return text;
@@ -160,9 +161,46 @@ export function usePdfTextSearch(pdf: PDFDocumentProxy | null) {
             const highlighted = escapeHtml(text.slice(range.start, range.end));
             cursor = range.end;
             const activeClass = range.active ? " pdf-search-highlight-active" : "";
-            return `${before}<mark class="pdf-search-highlight${activeClass}">${highlighted}</mark>`;
+            return `${before}<mark class="pdf-search-highlight${activeClass}" data-pdf-search-match="${range.matchIndex}">${highlighted}</mark>`;
         }).join("") + escapeHtml(text.slice(cursor));
     }, [activeIndex, matches, query]);
+
+    useEffect(() => {
+        if (!query || matches.length === 0) return;
+
+        let frame = 0;
+        let attempts = 0;
+        let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const focusActiveMatch = () => {
+            const activeMatch = document.querySelector<HTMLElement>(
+                `[data-pdf-search-match="${activeIndex}"]`,
+            );
+
+            // Pages are virtualized, so wait briefly for the target page's text
+            // layer to mount after next/prev changes the active match.
+            if (!activeMatch && attempts < 20) {
+                attempts += 1;
+                frame = requestAnimationFrame(focusActiveMatch);
+                return;
+            }
+            if (!activeMatch) return;
+
+            activeMatch.scrollIntoView({ block: "center" });
+            activeMatch.classList.remove("pdf-search-highlight-flash");
+            void activeMatch.offsetWidth;
+            activeMatch.classList.add("pdf-search-highlight-flash");
+            flashTimer = setTimeout(() => {
+                activeMatch.classList.remove("pdf-search-highlight-flash");
+            }, 300);
+        };
+
+        frame = requestAnimationFrame(focusActiveMatch);
+        return () => {
+            cancelAnimationFrame(frame);
+            if (flashTimer) clearTimeout(flashTimer);
+        };
+    }, [activeIndex, matches.length, query]);
 
     return useMemo(() => ({
         query,

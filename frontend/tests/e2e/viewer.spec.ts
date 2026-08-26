@@ -37,6 +37,22 @@ test.describe('PDF Viewer Flow', () => {
       await expect(page.getByRole('button', { name: 'Next search result' })).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(searchInput).toHaveValue('');
+
+      const fullscreenButton = page.getByRole('button', { name: 'Open in fullscreen reader' });
+      await fullscreenButton.click();
+
+      const readerDialog = page.getByRole('dialog', { name: /Reading / });
+      await expect(readerDialog).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Document breadcrumb' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Toggle minimap' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Toggle document outline' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Split view (coming soon)' })).toBeDisabled();
+      await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
+
+      await page.keyboard.press('?');
+      await expect(page.getByRole('region', { name: 'Keyboard shortcuts' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(readerDialog).toBeHidden();
     } else {
       console.log('No documents available on the home page to test the viewer.');
     }
