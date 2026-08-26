@@ -21,7 +21,7 @@ export const viewport: Viewport = {
 
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://academic-portal-blush.vercel.app"),
+  metadataBase: new URL(process.env.APP_URL || "https://revize-in.vercel.app"),
   title: {
     template: "%s | Revize",
     default: "Revize",

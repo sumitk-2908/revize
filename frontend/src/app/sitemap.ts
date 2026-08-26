@@ -4,9 +4,9 @@ import { subjectSlug as generateFallbackSlug, documentPath } from '@/components/
 import { getCachedSubjects } from '@/app/lib/api/cached-subjects';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.SITE_URL || 'http://localhost:3000';
   const supabase = await createClient();
-  
+
   const routes: MetadataRoute.Sitemap = [
     {
       url: `${baseUrl}`,
@@ -34,19 +34,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (documents && documents.length > 0) {
     const subjects = new Set<string>();
     const modulesBySubject = new Map<string, Set<number>>();
-    
+
     documents.forEach((doc) => {
       if (doc.subject) {
         subjects.add(doc.subject);
-        
+
         if (!modulesBySubject.has(doc.subject)) {
           modulesBySubject.set(doc.subject, new Set());
         }
-        
+
         if (doc.module_id) {
           modulesBySubject.get(doc.subject)!.add(doc.module_id);
         }
-        
+
         const currentSlug = subjectSlugMap.get(doc.subject) || generateFallbackSlug(doc.subject);
 
         // Add individual document route (title slug, id only as a fallback).
@@ -63,7 +63,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Add subject routes
     subjects.forEach((subject) => {
       const currentSlug = subjectSlugMap.get(subject) || generateFallbackSlug(subject);
-      
+
       routes.push({
         url: `${baseUrl}/subject/${currentSlug}`,
         lastModified: new Date(),

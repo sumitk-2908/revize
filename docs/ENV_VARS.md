@@ -10,8 +10,8 @@ Do not commit `.env`, `.env.*`, `*.env`, service-role keys, private signing keys
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Public Supabase anon key; database permissions remain enforced by RLS |
 | `NEXT_PUBLIC_API_URL` | Yes | Base URL of the FastAPI service, for example `http://localhost:8000` |
 | `NEXT_PUBLIC_R2_PUBLIC_URL` | Yes | Public R2 base URL for uploaded files and thumbnails; must match the backend's `R2_PUBLIC_URL`. Read at build time to derive the CSP and image allow-lists, so the build fails if it is absent |
-| `NEXT_PUBLIC_APP_URL` | Recommended | Canonical metadata base URL; the app has a hosted fallback in code |
-| `NEXT_PUBLIC_SITE_URL` | Recommended | Sitemap and robots base URL; defaults to `http://localhost:3000` |
+| `APP_URL` | Recommended | Server-only canonical metadata base URL; the app has a hosted fallback in code |
+| `SITE_URL` | Recommended | Server-only sitemap and robots base URL; defaults to `http://localhost:3000` |
 | `PLAYWRIGHT_TEST_BASE_URL` | E2E only | Overrides the Playwright target URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | E2E/local admin setup only | Optional privileged key used by the Playwright global setup; never expose it to the browser or commit it |
 | `NEXT_PUBLIC_SENTRY_DSN` | Optional | Frontend Sentry DSN, if configured by the Sentry integration |

@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     CORS_ORIGINS: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
-        "https://academic-portal-blush.vercel.app",
+        "https://revize-in.vercel.app",
         "https://academic-portal-git-beta-sumitk2408-s-projects.vercel.app",
     ]
     SENTRY_DSN: str | None = None

@@ -26,6 +26,13 @@
   --primary-foreground: #ffffff;
   --accent: #eef2ff;
 
+  /* Revize identity — readable against light surfaces */
+  --brand-teal: #075968;
+  --brand-wordmark: #075968;
+  --brand-gold-start: #9a681b;
+  --brand-gold-mid: #b87916;
+  --brand-gold-end: #80500f;
+
   /* Retained Semantic Tokens & structural variables */
   --success: #10b981;
   --warning: #f59e0b;
@@ -48,6 +55,13 @@
   --primary: #818cf8;
   --primary-foreground: #09090b;
   --accent: #312e81;
+
+  /* Revize identity — warm metallic wordmark from the reference */
+  --brand-teal: #075968;
+  --brand-wordmark: #e9c36f;
+  --brand-gold-start: #f2d58a;
+  --brand-gold-mid: #c9912e;
+  --brand-gold-end: #f0ce7a;
 
   /* Semantic adjustments for dark contrast */
   --success: #34d399;
@@ -123,6 +137,27 @@ body {
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+.brand-wordmark {
+  color: var(--brand-wordmark);
+}
+
+.dark .brand-wordmark {
+  background-image: linear-gradient(105deg, var(--brand-gold-start) 5%, var(--brand-gold-mid) 52%, var(--brand-gold-end) 95%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-sparkle {
+  color: var(--brand-gold-mid);
+  filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--brand-gold-mid) 28%, transparent));
+}
+
+.brand-logo-frame {
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--brand-teal) 20%, transparent), 0 0 0 1px color-mix(in srgb, var(--brand-teal) 28%, transparent);
 }
 
 .hide-scrollbar::-webkit-scrollbar {

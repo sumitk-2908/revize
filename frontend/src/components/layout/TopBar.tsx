@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import {
   Search, Moon, Sun, PanelLeft, PanelLeftClose,
-  Bell, CheckCheck, Plus
+  Bell, CheckCheck, Plus, Sparkles
 } from "lucide-react";
-import { RevizeMascot } from "@/components/brand/RevizeMascot";
 import { useSidebar } from "@/app/context/SidebarContext";
 import { useTheme } from "@/app/context/ThemeContext";
 import { useAuth } from "@/app/context/AuthContext";
@@ -82,24 +80,34 @@ export const TopBar = () => {
     <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur-xl">
       <div className="mx-auto flex min-h-14 w-full max-w-[1600px] items-center gap-2 px-2 py-2 md:min-h-16 md:gap-4 md:px-6 md:py-0">
 
-        <div className="flex shrink-0 items-center gap-2.5">
+        <div className="flex shrink-0 items-center">
           <button
+            type="button"
             aria-label={sidebarCollapsed ? "Open sidebar" : "Close sidebar"}
+            title={sidebarCollapsed ? "Open sidebar" : "Close sidebar"}
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="group relative flex w-auto items-center gap-2.5 text-left"
+            className="group flex items-center gap-2.5 rounded-xl p-0.5 text-left sm:gap-3"
           >
-            <div className="relative flex size-9 items-center justify-center rounded-xl bg-transparent text-foreground transition-colors group-hover:bg-surface-hover md:bg-primary md:text-primary-foreground md:shadow-sm md:group-hover:bg-surface-hover md:group-hover:text-foreground">
-              <img src="/mascot/revize-logo.svg" alt="Revize" className="size-7 object-contain transition-opacity duration-200 opacity-100 group-hover:opacity-0" />
-              <div className="absolute transition-opacity duration-200 opacity-0 group-hover:opacity-100 flex items-center justify-center">
+            <span className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl shadow-[0_5px_14px_color-mix(in_srgb,var(--brand-teal)_20%,transparent),0_0_0_1px_color-mix(in_srgb,var(--brand-teal)_28%,transparent)] transition-transform duration-200 group-hover:scale-105 md:size-11">
+              <img
+                src="/mascot/revize-header-mark.svg"
+                alt=""
+                aria-hidden="true"
+                className="size-full object-contain transition-opacity duration-200 group-hover:opacity-15"
+              />
+              <span className="absolute inset-0 flex items-center justify-center text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                 {sidebarCollapsed ? <PanelLeft size={20} /> : <PanelLeftClose size={20} />}
-              </div>
-            </div>
-            <div className="hidden leading-tight sm:block relative h-[36px] w-[120px]">
-              <p className="text-sm font-extrabold tracking-tight absolute top-1/2 -translate-y-1/2 transition-opacity duration-200 opacity-100 group-hover:opacity-0 whitespace-nowrap">Revize</p>
-              <p className="text-sm font-extrabold tracking-tight text-muted absolute top-1/2 -translate-y-1/2 transition-opacity duration-200 opacity-0 group-hover:opacity-100 whitespace-nowrap">
+              </span>
+            </span>
+            <span className="relative hidden h-10 w-[118px] leading-none sm:block md:w-[130px]">
+              <span className="absolute top-1/2 inline-flex -translate-y-1/2 items-start bg-none text-[23px] font-extrabold tracking-[-0.055em] text-[var(--brand-wordmark)] transition-opacity duration-200 group-hover:opacity-0 md:text-[26px] dark:bg-linear-to-br dark:from-[var(--brand-gold-start)] dark:via-[var(--brand-gold-mid)] dark:to-[var(--brand-gold-end)] dark:bg-clip-text dark:text-transparent">
+                Revize
+                <Sparkles aria-hidden="true" className="-mt-1 ml-0.5 size-3.5 text-[var(--brand-gold-mid)] drop-shadow-sm md:-mt-1.5 md:size-4" strokeWidth={2.5} />
+              </span>
+              <span className="absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-sm font-extrabold tracking-tight text-muted opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                 {sidebarCollapsed ? "Open sidebar" : "Close sidebar"}
-              </p>
-            </div>
+              </span>
+            </span>
           </button>
         </div>
 
