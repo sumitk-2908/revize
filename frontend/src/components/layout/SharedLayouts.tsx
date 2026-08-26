@@ -1,5 +1,6 @@
 import React from "react";
 import { Loader2, type LucideIcon } from "lucide-react";
+import { RevizeMascot } from "@/components/brand/RevizeMascot";
 
 /** 
  * 1. Page Header (New)
@@ -67,7 +68,7 @@ export const EmptyState = ({
   action?: React.ReactNode;
 }) => (
   <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface-hover/50 p-12 text-center">
-    {Icon && <Icon className="mb-4 size-8 text-muted opacity-50" />}
+    {Icon ? <Icon className="mb-4 size-8 text-muted opacity-50" /> : <RevizeMascot state="default" decorative className="mb-4 size-16" />}
     {title && <h3 className="text-lg font-extrabold tracking-tight text-foreground">{title}</h3>}
     <p className={`${title ? "mt-1" : ""} max-w-md text-base font-medium text-muted`}>{message}</p>
     {action && <div className="mt-5 flex flex-wrap items-center justify-center gap-3">{action}</div>}
@@ -202,7 +203,8 @@ export const ProfileSkeleton = () => (
 );
 
 export const CenteredSpinner = () => (
-  <div className="col-span-full flex justify-center py-12">
-    <InlineSpinner className="text-primary" size={24} />
+  <div className="col-span-full flex flex-col items-center justify-center gap-2 py-12">
+    <RevizeMascot state="thinking" decorative className="size-14 animate-pulse" />
+    <InlineSpinner className="text-primary" size={18} />
   </div>
 );

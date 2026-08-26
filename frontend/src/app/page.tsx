@@ -6,16 +6,16 @@ import { getCachedSubjects, getCachedSubjectCounts, getCachedBranches } from "@/
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Academic Resource Hub — Notes, PYQs & Study Materials for Engineering",
+    absolute: "Revize — Notes, PYQs & Study Materials for Engineering",
   },
   description: "Free notes, previous year questions, and study materials for 18+ engineering subjects. Crowd-sourced and peer-reviewed.",
   openGraph: {
-    title: "Academic Resource Hub — Notes, PYQs & Study Materials for Engineering",
+    title: "Revize — Notes, PYQs & Study Materials for Engineering",
     description: "Free notes, previous year questions, and study materials for 18+ engineering subjects. Crowd-sourced and peer-reviewed.",
     url: "/",
   },
   twitter: {
-    title: "Academic Resource Hub — Notes, PYQs & Study Materials for Engineering",
+    title: "Revize — Notes, PYQs & Study Materials for Engineering",
     description: "Free notes, previous year questions, and study materials for 18+ engineering subjects.",
   }
 };

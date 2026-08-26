@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  GraduationCap, Search, Moon, Sun, PanelLeft, PanelLeftClose,
+  Search, Moon, Sun, PanelLeft, PanelLeftClose,
   Bell, CheckCheck, Plus
 } from "lucide-react";
+import { RevizeMascot } from "@/components/brand/RevizeMascot";
 import { useSidebar } from "@/app/context/SidebarContext";
 import { useTheme } from "@/app/context/ThemeContext";
 import { useAuth } from "@/app/context/AuthContext";
@@ -88,13 +89,13 @@ export const TopBar = () => {
             className="group relative flex w-auto items-center gap-2.5 text-left"
           >
             <div className="relative flex size-9 items-center justify-center rounded-xl bg-transparent text-foreground transition-colors group-hover:bg-surface-hover md:bg-primary md:text-primary-foreground md:shadow-sm md:group-hover:bg-surface-hover md:group-hover:text-foreground">
-              <GraduationCap size={20} className="absolute transition-opacity duration-200 opacity-100 group-hover:opacity-0" />
+              <img src="/mascot/revize-logo.svg" alt="Revize" className="size-7 object-contain transition-opacity duration-200 opacity-100 group-hover:opacity-0" />
               <div className="absolute transition-opacity duration-200 opacity-0 group-hover:opacity-100 flex items-center justify-center">
                 {sidebarCollapsed ? <PanelLeft size={20} /> : <PanelLeftClose size={20} />}
               </div>
             </div>
             <div className="hidden leading-tight sm:block relative h-[36px] w-[120px]">
-              <p className="text-sm font-extrabold tracking-tight absolute top-1/2 -translate-y-1/2 transition-opacity duration-200 opacity-100 group-hover:opacity-0 whitespace-nowrap">Academic Portal</p>
+              <p className="text-sm font-extrabold tracking-tight absolute top-1/2 -translate-y-1/2 transition-opacity duration-200 opacity-100 group-hover:opacity-0 whitespace-nowrap">Revize</p>
               <p className="text-sm font-extrabold tracking-tight text-muted absolute top-1/2 -translate-y-1/2 transition-opacity duration-200 opacity-0 group-hover:opacity-100 whitespace-nowrap">
                 {sidebarCollapsed ? "Open sidebar" : "Close sidebar"}
               </p>

@@ -186,7 +186,7 @@ export default function ProfileHeader({ user, streak }: { user: any, streak?: an
 
             <p className="mb-3 text-sm font-medium text-muted">{email}</p>
             <div className="flex flex-wrap justify-center gap-3 text-sm font-medium text-muted sm:justify-start sm:gap-4">
-              <span className="flex items-center gap-1.5"><GraduationCap size={14} aria-hidden="true" /> {[branches.find(b => b.id === branchId)?.code, getYearLabel(year)].filter(Boolean).join(" · ") || "Academic Portal"}</span>
+              <span className="flex items-center gap-1.5"><GraduationCap size={14} aria-hidden="true" /> {[branches.find(b => b.id === branchId)?.code, getYearLabel(year)].filter(Boolean).join(" · ") || "Revize"}</span>
               <span className="flex items-center gap-1.5"><BookOpen size={14} aria-hidden="true" /> Student Account</span>
             </div>
           </div>

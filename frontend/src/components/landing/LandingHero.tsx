@@ -2,7 +2,8 @@
 
 import { useAuth } from "@/app/context/AuthContext";
 import { motion, useReducedMotion } from "framer-motion";
-import { GraduationCap, ShieldCheck, Cloud, Zap, Users } from "lucide-react";
+import { ShieldCheck, Cloud, Zap, Users } from "lucide-react";
+import { RevizeMascot } from "@/components/brand/RevizeMascot";
 
 const HERO_EASE = [0.32, 0.72, 0, 1] as const;
 
@@ -24,7 +25,7 @@ export function LandingHero() {
     <div className="relative mx-auto max-w-full overflow-hidden px-4 pb-12 pt-16 sm:pt-24">
       <div className="flex flex-col items-center text-center">
         <motion.div {...reveal(0)} className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary dark:bg-primary/20">
-          <GraduationCap size={16} />
+          <RevizeMascot state="celebrating" decorative className="size-5" withBackground={false} />
           Built for Students, by Students
         </motion.div>
 

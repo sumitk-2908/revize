@@ -114,7 +114,7 @@ export default function HomeClient({ initialSubjects, counts, branches }: HomeCl
           >
             <div className="flex min-w-0 items-baseline gap-2">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                Academic <span className="text-primary">Resource Hub</span>
+                Welcome to <span className="text-primary">Revize</span>
               </h1>
               {firstName && <span className="hidden text-sm text-muted sm:inline">· Welcome back, {firstName}</span>}
             </div>

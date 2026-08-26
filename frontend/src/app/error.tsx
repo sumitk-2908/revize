@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import { RevizeMascot } from "@/components/brand/RevizeMascot";
 
 export default function Error({
   error,
@@ -22,6 +23,7 @@ export default function Error({
       onReset={reset}
     >
       <div className="hidden">{error.message}</div>
+      <RevizeMascot state="confused" decorative className="mx-auto mt-4 size-16" />
     </ErrorBoundary>
   );
 }

@@ -1,14 +1,17 @@
 {
-  "name": "Academic Portal",
-  "short_name": "Portal",
-  "description": "Student Resource and PDF Study Hub",
+  "name": "Revize",
+  "short_name": "Revize",
+  "description": "Revize — Your Study Companion for Notes, PYQs & More",
   "start_url": "/",
   "id": "/?source=pwa",
   "display": "standalone",
   "background_color": "#0a0a0b",
-  "theme_color": "#6366f1",
+  "theme_color": "#ff694d",
   "orientation": "portrait-primary",
-  "categories": ["education", "productivity"],
+  "categories": [
+    "education",
+    "productivity"
+  ],
   "screenshots": [
     {
       "src": "/screenshot-1.png",
@@ -39,15 +42,15 @@
   ],
   "icons": [
     {
-      "src": "/icon-192x192.png",
+      "src": "/mascot/revize-icon-192.svg",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512x512.png",
+      "src": "/mascot/revize-icon-512.svg",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/svg+xml"
     }
   ]
 }

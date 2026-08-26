@@ -153,7 +153,7 @@ export const SidebarFooter = () => {
         <ProfileSidebarCard userName={uploadedBy || (isAdmin ? "Admin" : "Student")} role={roleDisplay} />
       )}
       <div className="mt-3 space-y-0.5 border-t border-border px-3 pt-4 text-xs font-medium tracking-[0.06em] text-muted">
-        <p>Academic Portal • Version 1.6</p>
+        <p>Revize • Version 1.6</p>
         <p>© {new Date().getFullYear()} All Rights Reserved.</p>
       </div>
     </div>

@@ -23,37 +23,41 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://academic-portal-blush.vercel.app"),
   title: {
-    template: "%s | Academic Portal",
-    default: "Academic Portal",
+    template: "%s | Revize",
+    default: "Revize",
   },
-  description: "Student Resource and PDF Study Hub",
-  manifest: "/manifest.json", 
+  description: "Revize — Your Study Companion for Notes, PYQs & More",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Academic Portal",
+    title: "Revize",
   },
   formatDetection: {
     telephone: false,
   },
   openGraph: {
     type: "website",
-    siteName: "Academic Portal",
+    siteName: "Revize",
     locale: "en_IN",
     images: [
       {
-        url: "/icon-512x512.png",
+        url: "/mascot/revize-icon-512.svg",
         width: 512,
         height: 512,
-        alt: "Academic Portal",
+        alt: "Revize",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Academic Portal",
-    description: "Student Resource and PDF Study Hub",
-    images: ["/icon-512x512.png"],
+    title: "Revize",
+    description: "Revize — Your Study Companion for Notes, PYQs & More",
+    images: ["/mascot/revize-icon-512.svg"],
+  },
+  icons: {
+    icon: "/mascot/revize-logo.svg",
+    apple: "/mascot/revize-icon-192.svg",
   },
 };
 
@@ -75,12 +79,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </Script>
       </head>
       <body suppressHydrationWarning className="flex min-h-screen flex-col font-sans antialiased">
-        
-       <QueryProvider> 
-        <ClientLayout>
-          {children}
-        </ClientLayout>
-       </QueryProvider>
+
+        <QueryProvider>
+          <ClientLayout>
+            {children}
+          </ClientLayout>
+        </QueryProvider>
       </body>
     </html>
   );
