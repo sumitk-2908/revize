@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Home, User, Bookmark, Menu, X, Upload, FileText, Settings, LogOut, Plus, Inbox, ClipboardList, Moon, Sun, Bell, CheckCheck } from "lucide-react";
+import { Home, User, Bookmark, Menu, X, Upload, FileText, Settings, LogOut, Plus, Inbox, ClipboardList, Moon, Sun, Bell, CheckCheck, BarChart2 } from "lucide-react";
 import { useSidebar } from "@/app/context/SidebarContext";
 import { useAuth } from "@/app/context/AuthContext";
 import { useTheme } from "@/app/context/ThemeContext";
@@ -136,6 +136,11 @@ export const MobileNav = () => {
                 <Dialog.Close asChild>
                   <Link href="/requests" className="motion-hover motion-active flex items-center gap-3 rounded-xl bg-surface-hover p-4 text-sm font-bold text-foreground transition-colors hover:bg-primary/10 hover:text-primary">
                     <ClipboardList size={20} aria-hidden="true" /> Requests
+                  </Link>
+                </Dialog.Close>
+                <Dialog.Close asChild>
+                  <Link href="/analytics" className="motion-hover motion-active flex items-center gap-3 rounded-xl bg-surface-hover p-4 text-sm font-bold text-foreground transition-colors hover:bg-primary/10 hover:text-primary">
+                    <BarChart2 size={20} aria-hidden="true" /> Analytics
                   </Link>
                 </Dialog.Close>
                 <Dialog.Close asChild>

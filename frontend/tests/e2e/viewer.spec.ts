@@ -39,6 +39,14 @@ test.describe('PDF Viewer Flow', () => {
       await page.keyboard.press('Escape');
       await expect(searchInput).toHaveValue('');
 
+      const progress = page.getByRole('slider', { name: 'Page progress' });
+      const progressTrack = page.getByLabel('Reading progress');
+      await expect(progress).toBeVisible();
+      await expect.poll(async () => {
+        const [thumbBox, trackBox] = await Promise.all([progress.boundingBox(), progressTrack.boundingBox()]);
+        return Boolean(thumbBox && trackBox && thumbBox.height <= trackBox.height);
+      }).toBe(true);
+
       const fullscreenButton = page.getByRole('button', { name: 'Open in fullscreen reader' });
       await fullscreenButton.click();
 
@@ -47,6 +55,7 @@ test.describe('PDF Viewer Flow', () => {
       await expect(page.getByRole('navigation', { name: 'Document breadcrumb' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Toggle minimap' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Toggle document outline' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Download document' })).toBeVisible();
       await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
 
       await page.keyboard.press('?');

@@ -728,6 +728,44 @@ body {
   }
 }
 
+/* Keep the PDF reading-progress handle within its slim track in Chromium,
+   Safari, and Firefox instead of using the browser's oversized default thumb. */
+#pdf-progress-range {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+#pdf-progress-range::-webkit-slider-runnable-track {
+  height: 2px;
+  background: rgb(63 63 70);
+}
+
+#pdf-progress-range::-webkit-slider-thumb {
+  width: 8px;
+  height: 8px;
+  margin-top: -3px;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  border-radius: 9999px;
+  background: rgb(129 140 248);
+}
+
+#pdf-progress-range::-moz-range-track {
+  height: 2px;
+  background: rgb(63 63 70);
+}
+
+#pdf-progress-range::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  border-radius: 9999px;
+  background: rgb(129 140 248);
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   *,

@@ -24,7 +24,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { InlineSpinner, SkeletonBlock } from "@/components/layout/SharedLayouts";
 import { dispatchToast as showToast } from "@/app/lib/toast";
-import { buildDownloadHref, getExtension, getFileKind, getFileLabel } from "@/app/lib/file-types";
+import { buildDownloadFilename, buildDownloadHref, getExtension, getFileKind, getFileLabel } from "@/app/lib/file-types";
 import { ensureDownloadAuth } from "@/app/lib/auth-prompts";
 import { usePdfTextSearch } from "./usePdfTextSearch";
 
@@ -163,9 +163,12 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   const [isSubmittingQuality, setIsSubmittingQuality] = useState(false);
 
   useEffect(() => {
+    // Once a vote has been loaded or changed locally, keep that state authoritative
+    // instead of replacing it with the stale server-rendered analytics object.
+    if (userRating !== null) return;
     const analyticsObj = Array.isArray(documentMeta?.document_analytics) ? documentMeta?.document_analytics[0] : documentMeta?.document_analytics;
     setUpvotesCount(analyticsObj?.upvotes || 0);
-  }, [documentMeta?.document_analytics]);
+  }, [documentMeta?.document_analytics, userRating]);
 
   useEffect(() => {
     const fetchUserRating = async () => {
@@ -604,12 +607,21 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   const handleDownloadClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!(await ensureDownloadAuth())) return;
-    if (isDownloading.current) return;
+    if (isDownloading.current || !documentMeta?.file_url) return;
 
-    const targetUrl = (e.currentTarget as HTMLAnchorElement).href || documentMeta.file_url;
     isDownloading.current = true;
-
     try {
+      const response = await fetch(documentMeta.file_url);
+      if (!response.ok) throw new Error("The document could not be downloaded");
+      const blobUrl = window.URL.createObjectURL(await response.blob());
+      const link = window.document.createElement('a');
+      link.href = blobUrl;
+      link.download = buildDownloadFilename(documentMeta.file_url, documentMeta.title);
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+
       await trackDocumentStat(documentMeta.id, 'download');
       const { data: sess } = await supabase.auth.getSession();
       if (sess?.session?.user?.id) {
@@ -624,10 +636,10 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
         await triggerStreakUpdate(sess.session.user.id);
       }
     } catch (error) {
-      console.error("Tracking failed:", error);
+      console.error("Download failed:", error);
+      showToast("Download Failed", "Could not download this document. Please try again.", "error");
     } finally {
-      window.open(targetUrl, '_blank');
-      setTimeout(() => { isDownloading.current = false; }, 2000);
+      setTimeout(() => { isDownloading.current = false; }, 800);
     }
   };
 
@@ -704,7 +716,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
                   <h2 className="truncate text-sm font-extrabold sm:text-base">{documentMeta.title}</h2>
                 </div>
                 <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-                  <ToolTip label={userRating ? "Remove upvote" : "Upvote document"}><button aria-label={userRating ? "Remove upvote" : "Upvote document"} aria-pressed={userRating === true} onClick={handleToggleUpvote} className={`${TOOLBAR_BUTTON} ${userRating ? 'text-indigo-300' : ''}`}><ThumbsUp size={18} /></button></ToolTip>
+                  <ToolTip label={userRating ? "Remove upvote" : "Upvote document"}><button aria-label={userRating ? "Remove upvote" : "Upvote document"} aria-pressed={userRating === true} onClick={handleToggleUpvote} className={`${TOOLBAR_BUTTON} ${userRating ? 'bg-success/15 text-success hover:bg-success/25' : ''}`}><ThumbsUp size={18} className={userRating ? 'fill-success' : ''} /></button></ToolTip>
                   <ToolTip label="Report an issue"><button aria-label="Report document" onClick={() => setIsFlagModalOpen(true)} className={TOOLBAR_BUTTON}><Flag size={18} /></button></ToolTip>
                   <DropdownMenu.Root><ToolTip label="Share"><DropdownMenu.Trigger asChild><button aria-label="Share document" className={TOOLBAR_BUTTON}><Share2 size={18} /></button></DropdownMenu.Trigger></ToolTip><DropdownMenu.Portal><DropdownMenu.Content className="z-50 min-w-36 overflow-hidden rounded-lg bg-zinc-900 p-1 shadow-xl ring-1 ring-white/10" align="end" sideOffset={6}><DropdownMenu.Item onClick={handleCopyLink} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">{copied ? <Check size={14} className="text-emerald-400" /> : <LinkIcon size={14} />}{copied ? 'Copied' : 'Copy link'}</DropdownMenu.Item><DropdownMenu.Item onClick={handleWhatsAppShare} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-emerald-400 outline-none hover:bg-white/10">WhatsApp</DropdownMenu.Item></DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
                   {canZoom ? <ToolTip label="Fullscreen"><button ref={fullscreenTriggerRef} aria-label="Open in fullscreen reader" onClick={() => setIsFullscreen(true)} className={TOOLBAR_BUTTON}><Maximize size={18} /></button></ToolTip> : <ToolTip label="Open file"><a aria-label="Open file" href={documentMeta.file_url} target="_blank" rel="noopener noreferrer" onClick={handleOpenFile} className={TOOLBAR_BUTTON}><Maximize size={18} /></a></ToolTip>}
@@ -727,7 +739,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
                   <ToolTip label="Next page"><button aria-label="Next Page" onClick={() => changePage(1)} disabled={currentPage >= numPages} className={TOOLBAR_BUTTON}><ChevronRight size={19} /></button></ToolTip>
                 </div>}
               </div>
-              {isPdf && <div className="flex h-1 shrink-0 items-center bg-zinc-950" aria-label="Reading progress"><input aria-label="Page progress" type="range" min="1" max={Math.max(1, numPages)} value={currentPage} onChange={(event) => goToPage(Number(event.target.value))} className="h-1 w-full accent-indigo-400" /><span className="sr-only">Page {currentPage} of {numPages}</span></div>}
+              {isPdf && <div className="flex h-2 shrink-0 items-center overflow-hidden bg-zinc-950" aria-label="Reading progress"><input id="pdf-progress-range" aria-label="Page progress" type="range" min="1" max={Math.max(1, numPages)} value={currentPage} onChange={(event) => goToPage(Number(event.target.value))} className="h-2 w-full accent-indigo-400" /><span className="sr-only">Page {currentPage} of {numPages}</span></div>}
             </>
           )}
 
@@ -749,7 +761,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
               {isPdf && <><ToolTip label={isSearchOpen ? "Close search" : "Find in document (Ctrl + F)"}><button aria-label={isSearchOpen ? "Close document search" : "Open document search"} onClick={() => setIsSearchOpen(open => !open)} className={`${TOOLBAR_BUTTON} ${isSearchOpen ? 'bg-indigo-500/10 text-indigo-300' : ''}`}><Search size={15} /></button></ToolTip>{isSearchOpen && <div className="flex items-center gap-0.5"><input ref={searchInputRef} autoFocus aria-label="Search document text" value={pdfSearch.query} onChange={(event) => pdfSearch.setQuery(event.target.value)} placeholder="Find" className="motion-focus h-8 w-24 rounded-md border border-white/10 bg-white/10 px-2 text-xs text-white outline-none placeholder:text-zinc-500 sm:w-36" /><span aria-live="polite" className="w-9 text-center text-[10px] tabular-nums text-zinc-400">{pdfSearch.isSearching ? '…' : pdfSearch.query ? `${pdfSearch.matches.length ? pdfSearch.activeIndex + 1 : 0}/${pdfSearch.matches.length}` : ''}</span><button aria-label="Previous search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('prev')} className={TOOLBAR_BUTTON}><ChevronLeft size={14} /></button><button aria-label="Next search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('next')} className={TOOLBAR_BUTTON}><ChevronRight size={14} /></button></div>}</>}
               <ToolTip label={isReadingDark ? "Light page mode" : "Dark page mode"}><button aria-label={isReadingDark ? "Use light page mode" : "Use dark page mode"} aria-pressed={isReadingDark} onClick={() => setIsReadingDark(value => !value)} className={TOOLBAR_BUTTON}>{isReadingDark ? <Sun size={15} /> : <Moon size={15} />}</button></ToolTip>
               <ToolTip label="Print"><button aria-label="Print document" onClick={handlePrint} className={TOOLBAR_BUTTON}><Printer size={15} /></button></ToolTip>
-              <ToolTip label="Download"><a aria-label="Download document" href={buildDownloadHref(documentMeta.file_url, documentMeta.title)} onClick={handleDownloadClick} className={TOOLBAR_BUTTON}><Download size={15} /></a></ToolTip>
+              <ToolTip label="Download"><button type="button" aria-label="Download document" onClick={handleDownloadClick} className={TOOLBAR_BUTTON}><Download size={15} /></button></ToolTip>
               <DropdownMenu.Root><ToolTip label="Share"><DropdownMenu.Trigger asChild><button aria-label="Share document" className={TOOLBAR_BUTTON}><Share2 size={16} /></button></DropdownMenu.Trigger></ToolTip><DropdownMenu.Portal><DropdownMenu.Content className="z-50 min-w-36 overflow-hidden rounded-lg bg-zinc-900 p-1 shadow-xl ring-1 ring-white/10" align="end" sideOffset={6}><DropdownMenu.Item onClick={handleCopyLink} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">{copied ? <Check size={14} className="text-emerald-400" /> : <LinkIcon size={14} />}{copied ? 'Copied' : 'Copy link'}</DropdownMenu.Item><DropdownMenu.Item onClick={handleWhatsAppShare} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-emerald-400 outline-none hover:bg-white/10">WhatsApp</DropdownMenu.Item></DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
               <span className="mx-1 h-5 w-px shrink-0 bg-white/15" />
               <ToolTip label="Toggle minimap"><button aria-pressed={isMinimapOpen} aria-label="Toggle minimap" onClick={() => setIsMinimapOpen(open => !open)} className={`${TOOLBAR_BUTTON} ${isMinimapOpen ? 'bg-indigo-500/10 text-indigo-300' : ''}`}><Map size={16} /></button></ToolTip>

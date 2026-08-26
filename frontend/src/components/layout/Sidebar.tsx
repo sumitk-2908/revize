@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Home, Inbox, Clock, Bookmark, Upload, ClipboardList } from "lucide-react";
-import { AnalyticsSidebar } from "@/components/layout/AnalyticsSidebar";
+import { Home, Inbox, Clock, Bookmark, Upload, ClipboardList, BarChart2 } from "lucide-react";
 import { useSidebar } from "@/app/context/SidebarContext";
 import { useAuth } from "@/app/context/AuthContext";
 import ProfileSidebarCard from "@/components/profile/ProfileSidebarCard";
@@ -112,7 +111,16 @@ export const SidebarNavigation = () => {
         </div>
 
         <div className="mt-6 border-t border-border pt-5">
-          <AnalyticsSidebar />
+          <Link
+            href="/analytics"
+            title={sidebarCollapsed ? "Analytics" : undefined}
+            className={`motion-hover motion-active flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${pathname === '/analytics'
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted hover:bg-surface-hover hover:text-primary'
+              }`}
+          >
+            <BarChart2 size={18} /> {!sidebarCollapsed && "Analytics"}
+          </Link>
         </div>
 
       </>

@@ -4,7 +4,7 @@ import type { DocumentRecord, DocumentWithAnalytics, DocumentsPage } from '../do
 export const getDocumentsByModule = async (moduleId: number): Promise<DocumentWithAnalytics[]> => {
   const { data, error } = await supabase
     .from('documents')
-    .select('*, document_analytics(upvotes)')
+    .select('*, document_analytics(upvotes, view_count, download_count)')
     .eq('module_id', moduleId)
     .eq('status', 'approved')
     .order('created_at', { ascending: false });
@@ -29,7 +29,7 @@ export const getPaginatedDocumentsByModule = async (
 
   let query = supabase
     .from('documents')
-    .select('*, document_analytics(upvotes, download_count)', { count: 'exact' })
+    .select('*, document_analytics(upvotes, view_count, download_count)', { count: 'exact' })
     .eq('module_id', moduleId)
     .eq('status', 'approved');
 
@@ -41,13 +41,17 @@ export const getPaginatedDocumentsByModule = async (
     query = query.ilike('subject', subjectName);
   }
 
-  if (sortBy === 'upvotes' || sortBy === 'download_count') {
-    query = query.order(sortBy, { foreignTable: 'document_analytics', ascending: false });
-  } else {
+  const needsAnalyticsSort = sortBy === 'upvotes' || sortBy === 'download_count';
+  if (!needsAnalyticsSort) {
     query = query.order(sortBy || 'created_at', { ascending: false });
   }
 
-  const { data, count, error } = await query.range(fromIndex, toIndex);
+  // Ordering an embedded relation does not reliably reorder the parent document
+  // rows in PostgREST. For analytics sorts, sort the filtered module result by
+  // the embedded scalar first and paginate that stable order afterward.
+  const { data: rawData, count, error } = needsAnalyticsSort
+    ? await query
+    : await query.range(fromIndex, toIndex);
 
   if (error) {
     if (error.code !== 'PGRST103') {
@@ -56,9 +60,19 @@ export const getPaginatedDocumentsByModule = async (
     return { data: [], nextCursor: null, total: 0 };
   }
 
-  const hasMore = count ? fromIndex + (data?.length || 0) < count : false;
+  const sortedData = needsAnalyticsSort
+    ? [...(rawData || [])]
+      .sort((a, b) => {
+        const aAnalytics = Array.isArray(a.document_analytics) ? a.document_analytics[0] : a.document_analytics;
+        const bAnalytics = Array.isArray(b.document_analytics) ? b.document_analytics[0] : b.document_analytics;
+        const analyticsDifference = (bAnalytics?.[sortBy] || 0) - (aAnalytics?.[sortBy] || 0);
+        return analyticsDifference || String(b.created_at || '').localeCompare(String(a.created_at || ''));
+      })
+      .slice(fromIndex, toIndex + 1)
+    : rawData || [];
+  const hasMore = count ? fromIndex + sortedData.length < count : false;
   return {
-    data: (data as unknown as DocumentWithAnalytics[]) || [],
+    data: sortedData as unknown as DocumentWithAnalytics[],
     nextCursor: hasMore ? page + 1 : null,
     total: count || 0
   };
