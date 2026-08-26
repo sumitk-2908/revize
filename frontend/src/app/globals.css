@@ -242,6 +242,20 @@ body {
   }
 }
 
+/* Reader-only inversion keeps the canvas readable without changing the app theme. */
+.pdf-reading-dark .bg-surface-hover {
+  background: #27272a;
+}
+
+.pdf-reading-dark .pdf-page-dark {
+  filter: invert(0.88) hue-rotate(180deg);
+}
+
+.pdf-reading-dark .pdf-page-dark .textLayer,
+.pdf-reading-dark .pdf-page-dark .annotationLayer {
+  filter: invert(1) hue-rotate(180deg);
+}
+
 /* Slim, theme-aware scrollbar for panes that scroll inside a card. */
 .custom-scrollbar {
   scrollbar-width: thin;

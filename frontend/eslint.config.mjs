@@ -13,6 +13,8 @@ const PROJECT_UTILITIES = [
   "animate-fade-up",
   "pb-safe",
   "sidebar-scroll",
+  "pdf-reading-dark",
+  "pdf-page-dark",
 ];
 
 /**

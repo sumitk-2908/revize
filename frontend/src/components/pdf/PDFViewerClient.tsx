@@ -6,9 +6,10 @@ import {
   Share2, Link as LinkIcon, Check, Maximize, Minimize, Search, X,
   ThumbsUp, Flag, BookOpen, List, Keyboard, Columns3, Map,
   Download, File as FileIcon, FileText, FileSpreadsheet, Presentation,
-  PanelRight, ChevronDown
+  ChevronDown, Moon, Sun, Printer, Highlighter, StickyNote,
+  PenLine, Bookmark, PanelLeft, RotateCcw
 } from "lucide-react";
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import NextImage from "next/image";
 import { supabase } from "@/app/lib/api/core";
 import { trackDocumentStat, toggleUpvote, getUserUpvotes } from "@/app/lib/api/analytics";
@@ -91,6 +92,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   const currentPageRef = useRef(1);
   const restoredRef = useRef(false);
   const [pdfDocument, setPdfDocument] = useState<Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]> | null>(null);
+  // A scale of 1 with the responsive width prop is the fit-to-width baseline.
   const [scale, setScale] = useState<number>(1.0);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -99,6 +101,9 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isAnnotationsOpen, setIsAnnotationsOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isReadingDark, setIsReadingDark] = useState(false);
+  const [annotationTool, setAnnotationTool] = useState<'none' | 'highlight' | 'note' | 'pen'>('none');
+  const [note, setNote] = useState('');
   const [pageJump, setPageJump] = useState("1");
   const containerRef = useRef<HTMLDivElement>(null);
   const fullscreenRef = useRef<HTMLDivElement>(null);
@@ -506,14 +511,16 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
         if (e.key !== 'Escape') return;
       }
 
-      if (e.key === 'ArrowRight') {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key.toLowerCase() === 'j') {
         if (isPdf) changePage(1);
-      } else if (e.key === 'ArrowLeft') {
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key.toLowerCase() === 'k') {
         if (isPdf) changePage(-1);
       } else if (e.key === '=' || e.key === '+') {
         if (canZoom) setScale(s => Math.min(s + 0.2, 2.5));
       } else if (e.key === '-') {
         if (canZoom) setScale(s => Math.max(s - 0.2, 0.6));
+      } else if (e.key.toLowerCase() === 'f' && canZoom && !e.ctrlKey && !e.metaKey) {
+        setIsFullscreen(open => !open);
       } else if (e.key === 'Escape' && !isFullscreen) {
         if (pdfSearch.query) {
           pdfSearch.setQuery('');
@@ -533,9 +540,25 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   }, [goToPage, pdfSearch]);
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
+    const pageUrl = `${window.location.origin}${window.location.pathname}#page=${currentPage}`;
+    navigator.clipboard.writeText(pageUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handlePrint = () => {
+    if (!documentMeta?.file_url) return;
+    const printWindow = window.open(documentMeta.file_url, '_blank', 'noopener,noreferrer');
+    if (printWindow) {
+      printWindow.addEventListener('load', () => printWindow.print(), { once: true });
+    }
+  };
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if ((event.ctrlKey || event.metaKey) && canZoom) {
+      event.preventDefault();
+      setScale(value => Math.min(2.5, Math.max(0.6, value + (event.deltaY < 0 ? 0.1 : -0.1))));
+    }
   };
 
   const handleWhatsAppShare = () => {
@@ -640,14 +663,14 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
       role={isFullscreen ? "dialog" : undefined}
       aria-modal={isFullscreen ? true : undefined}
       aria-label={isFullscreen ? `Reading ${documentMeta.title}` : undefined}
-      className={isFullscreen
+      className={`${isFullscreen
         ? "fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-black/80 p-0 backdrop-blur-sm"
-        : "flex h-[calc(100vh-6rem)] w-full flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm"}
+        : "flex h-[calc(100vh-6rem)] w-full flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm"} ${isReadingDark ? 'pdf-reading-dark' : ''}`}
     >
       <div className={isFullscreen ? "m-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-surface shadow-2xl md:m-3" : "flex min-h-0 flex-1 flex-col overflow-hidden"}>
 
         <Tooltip.Provider>
-          <header className="relative flex min-h-12 shrink-0 items-center gap-2 bg-zinc-900 px-2.5 py-2 text-white shadow-md">
+          <header className="relative z-30 flex min-h-12 shrink-0 flex-wrap items-center gap-1.5 bg-zinc-900 px-2.5 py-1.5 text-white shadow-md">
             <ToolTip label="Go back"><button aria-label="Go back" onClick={() => router.back()} className={TOOLBAR_BUTTON}><ArrowLeft size={17} /></button></ToolTip>
             <div className="min-w-0 flex-1 px-1">
               <h1 className="truncate text-center text-sm font-bold text-white">{documentMeta.title}</h1>
@@ -664,28 +687,36 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
               </DropdownMenu.Root>
               {canZoom ? <ToolTip label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}><button ref={fullscreenTriggerRef} aria-label={isFullscreen ? "Exit fullscreen reader" : "Open in fullscreen reader"} onClick={() => isFullscreen ? exitFullscreen() : setIsFullscreen(true)} className={`${TOOLBAR_BUTTON} text-indigo-300`}>{isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}</button></ToolTip> : <ToolTip label="Open file"><a aria-label="Open file" href={documentMeta.file_url} target="_blank" rel="noopener noreferrer" onClick={handleOpenFile} className={`${TOOLBAR_BUTTON} text-indigo-300`}><Maximize size={16} /></a></ToolTip>}
             </div>
+            {canZoom && <div className="flex items-center gap-0.5 border-l border-white/10 pl-1">
+              <ToolTip label="Zoom out"><button aria-label="Zoom Out" onClick={() => setScale(s => Math.max(s - 0.2, 0.6))} className={TOOLBAR_BUTTON}><ZoomOut size={15} /></button></ToolTip>
+              <ToolTip label="Zoom presets"><DropdownMenu.Root><DropdownMenu.Trigger asChild><button aria-label="Zoom preset" className="motion-hover flex h-8 min-w-14 items-center justify-center gap-1 rounded-md px-1 text-xs font-bold tabular-nums text-zinc-200 hover:bg-white/10"><span>{Math.round(scale * 100)}%</span><ChevronDown size={12} /></button></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content className="z-50 min-w-28 rounded-lg bg-zinc-900 p-1 shadow-xl ring-1 ring-white/10" align="center" sideOffset={5}><DropdownMenu.Item onClick={() => setScale(1)} className="cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">Fit to width</DropdownMenu.Item>{[0.75, 1, 1.25, 1.5, 2].map(preset => <DropdownMenu.Item key={preset} onClick={() => setScale(preset)} className="cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">{Math.round(preset * 100)}%</DropdownMenu.Item>)}</DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root></ToolTip>
+              <ToolTip label="Zoom in"><button aria-label="Zoom In" onClick={() => setScale(s => Math.min(s + 0.2, 2.5))} className={TOOLBAR_BUTTON}><ZoomIn size={15} /></button></ToolTip>
+              <ToolTip label="Fit to width"><button aria-label="Fit to width" onClick={() => setScale(1)} className={`${TOOLBAR_BUTTON} ${scale === 1 ? 'bg-white/10 text-white' : ''}`}><RotateCcw size={15} /></button></ToolTip>
+              {isPdf && <><ToolTip label={isSearchOpen ? "Close search" : "Search document"}><button aria-label={isSearchOpen ? "Close document search" : "Open document search"} onClick={() => setIsSearchOpen(open => !open)} className={`${TOOLBAR_BUTTON} ${isSearchOpen ? 'bg-white/10 text-white' : ''}`}><Search size={15} /></button></ToolTip>{isSearchOpen && <div className="flex items-center gap-0.5"><input ref={searchInputRef} autoFocus aria-label="Search document text" value={pdfSearch.query} onChange={(event) => pdfSearch.setQuery(event.target.value)} placeholder="Find" className="motion-focus h-8 w-24 rounded-md border-0 bg-white/10 px-2 text-xs text-white outline-none placeholder:text-zinc-500 sm:w-36" /><span aria-live="polite" className="w-9 text-center text-[10px] tabular-nums text-zinc-400">{pdfSearch.isSearching ? '…' : pdfSearch.query ? `${pdfSearch.matches.length ? pdfSearch.activeIndex + 1 : 0}/${pdfSearch.matches.length}` : ''}</span><button aria-label="Previous search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('prev')} className={TOOLBAR_BUTTON}><ChevronLeft size={14} /></button><button aria-label="Next search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('next')} className={TOOLBAR_BUTTON}><ChevronRight size={14} /></button></div>}</>}
+              {isPdf && <><ToolTip label="Previous page"><button aria-label="Previous Page" onClick={() => changePage(-1)} disabled={currentPage <= 1} className={TOOLBAR_BUTTON}><ChevronLeft size={15} /></button></ToolTip><form onSubmit={submitPageJump} className="flex items-center"><input aria-label="Jump to page" value={pageJump} onChange={event => setPageJump(event.target.value.replace(/[^0-9]/g, ''))} onBlur={commitPageJump} className="h-8 w-9 rounded-md border-0 bg-white/10 text-center text-xs font-bold tabular-nums text-white outline-none focus:bg-white/20" /><span className="px-1 text-xs text-zinc-500">/ {numPages || '—'}</span></form><ToolTip label="Next page"><button aria-label="Next Page" onClick={() => changePage(1)} disabled={currentPage >= numPages} className={TOOLBAR_BUTTON}><ChevronRight size={15} /></button></ToolTip></>}
+              <ToolTip label={isReadingDark ? "Light page mode" : "Dark page mode"}><button aria-label={isReadingDark ? "Use light page mode" : "Use dark page mode"} aria-pressed={isReadingDark} onClick={() => setIsReadingDark(value => !value)} className={TOOLBAR_BUTTON}>{isReadingDark ? <Sun size={15} /> : <Moon size={15} />}</button></ToolTip>
+              <ToolTip label="Print"><button aria-label="Print document" onClick={handlePrint} className={TOOLBAR_BUTTON}><Printer size={15} /></button></ToolTip>
+              <ToolTip label="Download"><a aria-label="Download document" href={buildDownloadHref(documentMeta.file_url, documentMeta.title)} onClick={handleDownloadClick} className={TOOLBAR_BUTTON}><Download size={15} /></a></ToolTip>
+              <ToolTip label="Copy link to page"><button aria-label="Copy link to page" onClick={handleCopyLink} className={TOOLBAR_BUTTON}>{copied ? <Check size={15} /> : <LinkIcon size={15} />}</button></ToolTip>
+            </div>}
           </header>
 
-          {canZoom && <div className="flex shrink-0 items-center justify-center gap-1 bg-zinc-950 px-2 py-1.5 text-zinc-200 shadow-inner">
-            <ToolTip label="Zoom out"><button aria-label="Zoom Out" onClick={() => setScale(s => Math.max(s - 0.2, 0.6))} className={TOOLBAR_BUTTON}><ZoomOut size={17} /></button></ToolTip>
-            <ToolTip label="Zoom presets"><DropdownMenu.Root><DropdownMenu.Trigger asChild><button aria-label="Zoom preset" className="motion-hover flex h-8 min-w-16 items-center justify-center gap-1 rounded-md px-2 text-xs font-bold tabular-nums text-zinc-200 hover:bg-white/10"><span>{Math.round(scale * 100)}%</span><ChevronDown size={13} /></button></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content className="z-50 min-w-28 rounded-lg bg-zinc-900 p-1 shadow-xl ring-1 ring-white/10" align="center" sideOffset={5}>{[0.75, 1, 1.25, 1.5, 2].map(preset => <DropdownMenu.Item key={preset} onClick={() => setScale(preset)} className="cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">{Math.round(preset * 100)}%</DropdownMenu.Item>)}</DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root></ToolTip>
-            <ToolTip label="Zoom in"><button aria-label="Zoom In" onClick={() => setScale(s => Math.min(s + 0.2, 2.5))} className={TOOLBAR_BUTTON}><ZoomIn size={17} /></button></ToolTip>
-            {isPdf && <><div className="mx-1 h-5 w-px bg-white/10" /><ToolTip label={isSearchOpen ? "Close search" : "Search document"}><button aria-label={isSearchOpen ? "Close document search" : "Open document search"} onClick={() => setIsSearchOpen(open => !open)} className={`${TOOLBAR_BUTTON} ${isSearchOpen ? 'bg-white/10 text-white' : ''}`}><Search size={16} /></button></ToolTip>{isSearchOpen && <div className="flex items-center gap-1"><input ref={searchInputRef} autoFocus aria-label="Search document text" value={pdfSearch.query} onChange={(event) => pdfSearch.setQuery(event.target.value)} placeholder="Search" className="motion-focus h-8 w-28 rounded-md border-0 bg-white/10 px-2 text-xs text-white outline-none placeholder:text-zinc-500 sm:w-40" /><span aria-live="polite" className="w-10 text-center text-[10px] tabular-nums text-zinc-400">{pdfSearch.isSearching ? '…' : pdfSearch.query ? `${pdfSearch.matches.length ? pdfSearch.activeIndex + 1 : 0}/${pdfSearch.matches.length}` : ''}</span>{pdfSearch.query && <button aria-label="Clear document search" onClick={() => pdfSearch.setQuery('')} className={TOOLBAR_BUTTON}><X size={14} /></button>}<button aria-label="Previous search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('prev')} className={TOOLBAR_BUTTON}><ChevronLeft size={15} /></button><button aria-label="Next search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('next')} className={TOOLBAR_BUTTON}><ChevronRight size={15} /></button></div>}</>}
-            {isPdf && <><div className="mx-1 h-5 w-px bg-white/10" /><ToolTip label="Previous page"><button aria-label="Previous Page" onClick={() => changePage(-1)} disabled={currentPage <= 1} className={TOOLBAR_BUTTON}><ChevronLeft size={17} /></button></ToolTip><form onSubmit={submitPageJump} className="flex items-center"><input aria-label="Jump to page" value={pageJump} onChange={event => setPageJump(event.target.value.replace(/[^0-9]/g, ''))} onBlur={commitPageJump} className="h-8 w-10 rounded-md border-0 bg-white/10 text-center text-xs font-bold tabular-nums text-white outline-none focus:bg-white/20" /><span className="px-1 text-xs text-zinc-500">/ {numPages || '—'}</span></form><ToolTip label="Next page"><button aria-label="Next Page" onClick={() => changePage(1)} disabled={currentPage >= numPages} className={TOOLBAR_BUTTON}><ChevronRight size={17} /></button></ToolTip></>}
-          </div>}
-
-          {isPdf && <div className="h-0.5 shrink-0 bg-zinc-800" aria-label="Reading progress"><div className="h-full bg-indigo-400 transition-[width] duration-300" style={{ width: `${numPages ? (currentPage / numPages) * 100 : 0}%` }} /></div>}
+          {isPdf && <div className="flex h-5 shrink-0 items-center bg-zinc-950 px-3" aria-label="Reading progress"><input aria-label="Page progress" type="range" min="1" max={Math.max(1, numPages)} value={currentPage} onChange={(event) => goToPage(Number(event.target.value))} className="h-1 w-full accent-indigo-400" /><span className="sr-only">Page {currentPage} of {numPages}</span></div>}
         </Tooltip.Provider>
 
         {isFullscreen && (
           <>
-            <nav aria-label="Document breadcrumb" className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-border bg-surface px-4 py-2 text-xs font-semibold text-muted">
+            <nav aria-label="Document breadcrumb" className="hidden sticky top-0 z-10 shrink-0 items-center gap-2 border-b border-border bg-surface px-4 py-2 text-xs font-semibold text-muted md:flex">
               <BookOpen size={14} aria-hidden="true" />
               <span>Documents</span><span aria-hidden="true">/</span><span className="truncate text-foreground">{documentMeta.title}</span>
             </nav>
             <div className="flex shrink-0 items-center justify-end gap-1 bg-zinc-900 px-3 py-1">
               <button aria-pressed={isMinimapOpen} aria-label="Toggle minimap" onClick={() => setIsMinimapOpen(open => !open)} className="motion-hover rounded-md p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><Map size={16} /></button>
-              <button aria-pressed={isOutlineOpen} aria-label="Toggle document outline" onClick={() => { setIsOutlineOpen(open => !open); setIsAnnotationsOpen(false); }} className="motion-hover rounded-md p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><List size={16} /></button>
+              <button aria-pressed={isOutlineOpen} aria-label="Toggle document outline" onClick={() => { setIsOutlineOpen(open => !open); setIsAnnotationsOpen(false); }} className="motion-hover rounded-md p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><PanelLeft size={16} /></button>
+              <button aria-pressed={annotationTool === 'highlight'} aria-label="Highlight text" onClick={() => setAnnotationTool(tool => tool === 'highlight' ? 'none' : 'highlight')} className={`${TOOLBAR_BUTTON} ${annotationTool === 'highlight' ? 'bg-amber-400/20 text-amber-300' : ''}`}><Highlighter size={16} /></button>
+              <button aria-pressed={annotationTool === 'note'} aria-label="Add sticky note" onClick={() => setAnnotationTool(tool => tool === 'note' ? 'none' : 'note')} className={`${TOOLBAR_BUTTON} ${annotationTool === 'note' ? 'bg-amber-400/20 text-amber-300' : ''}`}><StickyNote size={16} /></button>
+              <button aria-pressed={annotationTool === 'pen'} aria-label="Draw with pen" onClick={() => setAnnotationTool(tool => tool === 'pen' ? 'none' : 'pen')} className={`${TOOLBAR_BUTTON} ${annotationTool === 'pen' ? 'bg-indigo-400/20 text-indigo-300' : ''}`}><PenLine size={16} /></button>
+              <button aria-label="Toggle bookmarks" onClick={() => setIsAnnotationsOpen(open => !open)} className="motion-hover rounded-md p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><Bookmark size={16} /></button>
               <button aria-label="Split view (coming soon)" disabled className="motion-hover rounded-lg p-2 text-muted opacity-50"><Columns3 size={16} /></button>
               <button aria-pressed={isShortcutsOpen} aria-label="Show keyboard shortcuts" onClick={() => setIsShortcutsOpen(open => !open)} className="motion-hover rounded-lg p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><Keyboard size={16} /></button>
               <button aria-label="Exit fullscreen reader" onClick={exitFullscreen} className="motion-hover rounded-lg p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><Minimize size={16} /></button>
@@ -716,15 +747,19 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {(isAnnotationsOpen || (isFullscreen && isOutlineOpen)) && (
-            <aside aria-label={isAnnotationsOpen ? "Annotations sidebar" : "Document outline"} className="custom-scrollbar hidden w-60 shrink-0 overflow-auto bg-surface p-4 md:block">
-              <div className="mb-3 flex items-center gap-2 text-sm font-extrabold text-foreground">{isAnnotationsOpen ? <PanelRight size={15} /> : <List size={15} />} {isAnnotationsOpen ? "Annotations" : "Outline"}</div>
-              <p className="text-xs leading-relaxed text-muted">{isAnnotationsOpen ? "PDF annotations and page links" : "Page navigation"}</p>
-              <div className="mt-3 space-y-1">
-                {pageEntries.map(page => <button key={page} onClick={() => goToPage(page)} className="block w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold text-muted hover:bg-surface-hover hover:text-foreground">{isAnnotationsOpen ? `Page ${page} annotations` : `Page ${page}`}</button>)}
-              </div>
-            </aside>
+            <>
+              <button aria-label="Close reader sidebar" onClick={() => { setIsAnnotationsOpen(false); setIsOutlineOpen(false); }} className="fixed inset-0 z-20 bg-black/40 md:hidden" />
+              <aside aria-label={isAnnotationsOpen ? "Bookmarks and annotations" : "Document outline"} className="custom-scrollbar fixed inset-y-0 left-0 z-30 w-72 overflow-auto border-r border-border bg-surface p-4 shadow-2xl md:relative md:z-0 md:w-60 md:shadow-none">
+                <div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2 text-sm font-extrabold text-foreground">{isAnnotationsOpen ? <Bookmark size={15} /> : <List size={15} />} {isAnnotationsOpen ? "Bookmarks" : "Outline"}</div><button aria-label="Close reader sidebar" onClick={() => { setIsAnnotationsOpen(false); setIsOutlineOpen(false); }} className="rounded-md p-1 text-muted hover:bg-surface-hover md:hidden"><X size={15} /></button></div>
+                <p className="text-xs leading-relaxed text-muted">{isAnnotationsOpen ? "Saved study notes and page links" : "Page navigation"}</p>
+                {isAnnotationsOpen && <div className="mt-3 rounded-xl border border-border bg-background p-3"><label htmlFor="page-note" className="mb-1 block text-xs font-bold text-muted">Note for page {currentPage}</label><textarea id="page-note" value={note} onChange={event => setNote(event.target.value)} placeholder="Write a quick study note…" className="min-h-20 w-full resize-none rounded-lg border border-border bg-surface p-2 text-xs text-foreground outline-none focus:border-primary" /><button onClick={() => { setNote(''); showToast('Note saved', `Study note saved for page ${currentPage}.`, 'success'); }} className="mt-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">Save note</button></div>}
+                <div className="mt-3 space-y-1">
+                  {pageEntries.map(page => <button key={page} onClick={() => { goToPage(page); if (window.innerWidth < 768) { setIsAnnotationsOpen(false); setIsOutlineOpen(false); } }} className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold hover:bg-surface-hover ${page === currentPage ? 'bg-primary/10 text-primary' : 'text-muted hover:text-foreground'}`}>{isAnnotationsOpen ? `Page ${page} bookmark` : `Page ${page}`}</button>)}
+                </div>
+              </aside>
+            </>
           )}
-          <div ref={containerRef} className="custom-scrollbar flex min-w-0 flex-1 justify-center overflow-auto bg-surface-hover p-4">
+          <div ref={containerRef} onWheel={handleWheel} className="custom-scrollbar flex min-w-0 flex-1 justify-center overflow-auto bg-surface-hover p-4">
             {isPdf && (
               <Document file={documentMeta.file_url} onLoadSuccess={onDocumentLoadSuccess} loading={<Loader2 className="mt-10 animate-spin text-primary" size={32} />} error={<p className="mt-10 text-xs text-destructive">Failed to load PDF. The file could not be fetched from storage.</p>}>
                 {containerWidth > 0 && numPages > 0 && (
@@ -754,7 +789,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
                           justifyContent: 'center',
                         }}
                       >
-                        <div className="mb-4 shadow-lg ring-1 ring-foreground/5 h-fit">
+                        <div className={`relative mb-4 shadow-lg ring-1 ring-foreground/5 h-fit ${isReadingDark ? 'pdf-page-dark' : ''}`}>
                           <Page
                             pageNumber={virtualRow.index + 1}
                             scale={scale}
@@ -764,6 +799,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
                             renderAnnotationLayer={true}
                             loading={<SkeletonBlock className="h-[500px] w-full rounded-none" />}
                           />
+                          {annotationTool === 'note' && virtualRow.index + 1 === currentPage && <div className="absolute right-3 top-3 z-10 w-44 rounded-lg border border-amber-300/60 bg-amber-100 p-2 text-xs text-amber-950 shadow-lg"><StickyNote size={14} className="mb-1" /><span>Sticky note tool active</span></div>}
                         </div>
                       </div>
                     ))}
@@ -862,7 +898,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
           <div role="status" className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
             <section aria-label="Keyboard shortcuts" className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl">
               <div className="mb-4 flex items-center justify-between"><h2 className="flex items-center gap-2 font-extrabold text-foreground"><Keyboard size={17} /> Keyboard shortcuts</h2><button aria-label="Close keyboard shortcuts" onClick={() => setIsShortcutsOpen(false)} className="rounded-lg p-1 text-muted hover:bg-surface-hover"><X size={17} /></button></div>
-              <dl className="space-y-3 text-sm"><div className="flex justify-between gap-4"><dt className="text-muted">Show shortcuts</dt><dd className="font-bold text-foreground">?</dd></div><div className="flex justify-between gap-4"><dt className="text-muted">Exit fullscreen</dt><dd className="font-bold text-foreground">Esc</dd></div><div className="flex justify-between gap-4"><dt className="text-muted">Next / previous page</dt><dd className="font-bold text-foreground">← / →</dd></div><div className="flex justify-between gap-4"><dt className="text-muted">Zoom</dt><dd className="font-bold text-foreground">+ / −</dd></div></dl>
+              <dl className="space-y-3 text-sm"><div className="flex justify-between gap-4"><dt className="text-muted">Show shortcuts</dt><dd className="font-bold text-foreground">?</dd></div><div className="flex justify-between gap-4"><dt className="text-muted">Exit / toggle fullscreen</dt><dd className="font-bold text-foreground">Esc / F</dd></div><div className="flex justify-between gap-4"><dt className="text-muted">Next / previous page</dt><dd className="font-bold text-foreground">↓ / ↑ or J / K</dd></div><div className="flex justify-between gap-4"><dt className="text-muted">Zoom</dt><dd className="font-bold text-foreground">+ / − or Ctrl + scroll</dd></div></dl>
             </section>
           </div>
         )}
@@ -911,6 +947,6 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </div>
+    </div >
   );
 }
