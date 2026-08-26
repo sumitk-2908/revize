@@ -3,14 +3,18 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Home, User, Bookmark, Menu, X, Upload, FileText, Settings, LogOut, Plus, Inbox, ClipboardList } from "lucide-react";
+import { Home, User, Bookmark, Menu, X, Upload, FileText, Settings, LogOut, Plus, Inbox, ClipboardList, Moon, Sun, Bell, CheckCheck } from "lucide-react";
 import { useSidebar } from "@/app/context/SidebarContext";
 import { useAuth } from "@/app/context/AuthContext";
+import { useTheme } from "@/app/context/ThemeContext";
+import { useNotifications } from "@/app/context/NotificationsContext";
 import { requestUploadPrompt } from "@/app/lib/student-prompts";
 
 export const MobileNav = () => {
   const { pathname, showMobileMenu, setShowMobileMenu } = useSidebar();
   const { isAdmin, isStudent, openAuthPrompt, handleLogout } = useAuth();
+  const { isDarkMode, toggleTheme, mounted } = useTheme();
+  const { unreadCount, showNotifications, setShowNotifications, notifications, handleMarkAsRead } = useNotifications();
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
   const isSignedIn = isAdmin || isStudent;
 
@@ -140,7 +144,7 @@ export const MobileNav = () => {
                     onClick={() => requestUploadPrompt()}
                     className="motion-hover motion-active flex items-center gap-3 rounded-xl bg-surface-hover p-4 text-sm font-bold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                   >
-                    <Plus size={20} aria-hidden="true" /> Contribute
+                    <Plus size={20} aria-hidden="true" /> Upload
                   </button>
                 </Dialog.Close>
                 <Dialog.Close asChild>
@@ -148,6 +152,42 @@ export const MobileNav = () => {
                     <Settings size={20} aria-hidden="true" /> Settings
                   </Link>
                 </Dialog.Close>
+              </div>
+
+              <div className="space-y-3 border-t border-border pt-5">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted">Settings</p>
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="motion-hover motion-active flex w-full items-center justify-between rounded-xl bg-surface-hover p-4 text-sm font-bold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                >
+                  <span className="flex items-center gap-3">
+                    {mounted && isDarkMode ? <Sun size={20} aria-hidden="true" /> : <Moon size={20} aria-hidden="true" />}
+                    {mounted && isDarkMode ? "Light mode" : "Dark mode"}
+                  </span>
+                  <span className="text-xs text-muted">Theme</span>
+                </button>
+                {isSignedIn && (
+                  <button
+                    type="button"
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    aria-expanded={showNotifications}
+                    className="motion-hover motion-active flex w-full items-center justify-between rounded-xl bg-surface-hover p-4 text-sm font-bold text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                  >
+                    <span className="flex items-center gap-3"><Bell size={20} aria-hidden="true" /> Notifications</span>
+                    {unreadCount > 0 && <span className="rounded-full bg-destructive px-2 py-0.5 text-xs text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+                  </button>
+                )}
+                {showNotifications && isSignedIn && (
+                  <div role="dialog" aria-label="Notifications" className="max-h-64 space-y-1 overflow-y-auto rounded-xl border border-border bg-surface p-2">
+                    {notifications.length === 0 ? <p className="p-4 text-center text-xs text-muted">All caught up!</p> : notifications.map((notif) => (
+                      <button type="button" key={notif.id} onClick={() => handleMarkAsRead(notif.id, notif.is_read ?? false)} className={`flex w-full cursor-pointer flex-col gap-1 rounded-xl p-3 text-left transition-colors hover:bg-surface-hover ${!notif.is_read ? "bg-accent/50" : ""}`}>
+                        <span className="flex items-start justify-between gap-2"><span className={`text-xs ${!notif.is_read ? "font-bold text-foreground" : "font-semibold text-muted"}`}>{notif.title}</span>{!notif.is_read ? <span className="mt-1 size-2 shrink-0 rounded-full bg-primary" /> : <CheckCheck size={12} className="mt-0.5 shrink-0 text-success" />}</span>
+                        <span className="text-xs leading-tight text-muted">{notif.message}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {isSignedIn && (

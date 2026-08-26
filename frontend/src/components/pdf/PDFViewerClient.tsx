@@ -96,6 +96,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   const [scale, setScale] = useState<number>(1.0);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isHudVisible, setIsHudVisible] = useState(true);
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [isMinimapOpen, setIsMinimapOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
@@ -460,6 +461,32 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   }, []);
 
   useEffect(() => {
+    if (!isFullscreen) {
+      setIsHudVisible(true);
+      return;
+    }
+
+    let hideTimer: ReturnType<typeof setTimeout> | null = null;
+    const revealHud = () => {
+      setIsHudVisible(true);
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => setIsHudVisible(false), 2500);
+    };
+
+    revealHud();
+    const reader = fullscreenRef.current;
+    reader?.addEventListener('mousemove', revealHud);
+    reader?.addEventListener('pointerdown', revealHud);
+    reader?.addEventListener('touchstart', revealHud, { passive: true });
+    return () => {
+      if (hideTimer) clearTimeout(hideTimer);
+      reader?.removeEventListener('mousemove', revealHud);
+      reader?.removeEventListener('pointerdown', revealHud);
+      reader?.removeEventListener('touchstart', revealHud);
+    };
+  }, [isFullscreen]);
+
+  useEffect(() => {
     if (!isFullscreen) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const focusableSelector = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
@@ -664,65 +691,49 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
       aria-modal={isFullscreen ? true : undefined}
       aria-label={isFullscreen ? `Reading ${documentMeta.title}` : undefined}
       className={`${isFullscreen
-        ? "fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-black/80 p-0 backdrop-blur-sm"
+        ? "fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-black/90 p-0 backdrop-blur-sm"
         : "flex h-[calc(100vh-6rem)] w-full flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-sm"} ${isReadingDark ? 'pdf-reading-dark' : ''}`}
     >
-      <div className={isFullscreen ? "m-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-surface shadow-2xl md:m-3" : "flex min-h-0 flex-1 flex-col overflow-hidden"}>
-
+      <div className={isFullscreen ? "relative flex min-h-0 flex-1 flex-col overflow-hidden bg-surface" : "flex min-h-0 flex-1 flex-col overflow-hidden"}>
         <Tooltip.Provider>
-          <header className="relative z-30 flex min-h-12 shrink-0 flex-wrap items-center gap-1.5 bg-zinc-900 px-2.5 py-1.5 text-white shadow-md">
-            <ToolTip label="Go back"><button aria-label="Go back" onClick={() => router.back()} className={TOOLBAR_BUTTON}><ArrowLeft size={17} /></button></ToolTip>
-            <div className="min-w-0 flex-1 px-1">
-              <h1 className="truncate text-center text-sm font-bold text-white">{documentMeta.title}</h1>
+          <header className={isFullscreen ? `absolute bottom-6 left-1/2 z-40 flex w-[calc(100%-1rem)] max-w-5xl -translate-x-1/2 items-center justify-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-zinc-900/80 p-1.5 text-white shadow-2xl backdrop-blur-md transition-opacity duration-300 sm:gap-1.5 sm:rounded-full sm:px-2 ${isHudVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}` : "flex min-h-12 shrink-0 items-center gap-1 border-b border-border bg-zinc-900 px-2 text-white shadow-md sm:gap-1.5 sm:px-3"}>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <ToolTip label="Go back"><button aria-label="Go back" onClick={() => router.back()} className={TOOLBAR_BUTTON}><ArrowLeft size={17} /></button></ToolTip>
+              {isFullscreen && <ToolTip label="Toggle document outline"><button aria-pressed={isOutlineOpen} aria-label="Toggle document outline" onClick={() => { setIsOutlineOpen(open => !open); setIsAnnotationsOpen(false); }} className={`${TOOLBAR_BUTTON} ${isOutlineOpen ? 'bg-indigo-500/10 text-indigo-300' : ''}`}><PanelLeft size={16} /></button></ToolTip>}
+              {isPdf && <><ToolTip label="Previous page"><button aria-label="Previous Page" onClick={() => changePage(-1)} disabled={currentPage <= 1} className={TOOLBAR_BUTTON}><ChevronLeft size={15} /></button></ToolTip><form onSubmit={submitPageJump} className="flex items-center"><input aria-label="Jump to page" value={pageJump} onChange={event => setPageJump(event.target.value.replace(/[^0-9]/g, ''))} onBlur={commitPageJump} className="h-8 w-9 rounded-md border border-white/10 bg-white/10 text-center text-xs font-bold tabular-nums text-white outline-none focus:bg-white/20" /><span className="px-1 text-xs text-zinc-400">/ {numPages || '—'}</span></form><ToolTip label="Next page"><button aria-label="Next Page" onClick={() => changePage(1)} disabled={currentPage >= numPages} className={TOOLBAR_BUTTON}><ChevronRight size={15} /></button></ToolTip></>}
             </div>
-            <div className="flex items-center gap-0.5">
-              <ToolTip label={`Upvote${upvotesCount ? ` (${upvotesCount})` : ''}`}><button aria-label="Upvote document" onClick={handleToggleUpvote} className={`${TOOLBAR_BUTTON} ${userRating === true ? 'text-emerald-400' : ''}`}><ThumbsUp size={16} className={userRating === true ? 'fill-current' : ''} /></button></ToolTip>
-              <ToolTip label="Report issue"><button aria-label="Report issue" onClick={() => setIsFlagModalOpen(true)} className={TOOLBAR_BUTTON}><Flag size={16} /></button></ToolTip>
-              <DropdownMenu.Root>
-                <ToolTip label="Share"><DropdownMenu.Trigger asChild><button aria-label="Share document" className={TOOLBAR_BUTTON}><Share2 size={16} /></button></DropdownMenu.Trigger></ToolTip>
-                <DropdownMenu.Portal><DropdownMenu.Content className="z-50 min-w-36 overflow-hidden rounded-lg bg-zinc-900 p-1 shadow-xl ring-1 ring-white/10" align="end" sideOffset={6}>
-                  <DropdownMenu.Item onClick={handleCopyLink} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">{copied ? <Check size={14} className="text-emerald-400" /> : <LinkIcon size={14} />}{copied ? 'Copied' : 'Copy link'}</DropdownMenu.Item>
-                  <DropdownMenu.Item onClick={handleWhatsAppShare} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-emerald-400 outline-none hover:bg-white/10">WhatsApp</DropdownMenu.Item>
-                </DropdownMenu.Content></DropdownMenu.Portal>
-              </DropdownMenu.Root>
-              {canZoom ? <ToolTip label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}><button ref={fullscreenTriggerRef} aria-label={isFullscreen ? "Exit fullscreen reader" : "Open in fullscreen reader"} onClick={() => isFullscreen ? exitFullscreen() : setIsFullscreen(true)} className={`${TOOLBAR_BUTTON} text-indigo-300`}>{isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}</button></ToolTip> : <ToolTip label="Open file"><a aria-label="Open file" href={documentMeta.file_url} target="_blank" rel="noopener noreferrer" onClick={handleOpenFile} className={`${TOOLBAR_BUTTON} text-indigo-300`}><Maximize size={16} /></a></ToolTip>}
-            </div>
-            {canZoom && <div className="flex items-center gap-0.5 border-l border-white/10 pl-1">
-              <ToolTip label="Zoom out"><button aria-label="Zoom Out" onClick={() => setScale(s => Math.max(s - 0.2, 0.6))} className={TOOLBAR_BUTTON}><ZoomOut size={15} /></button></ToolTip>
-              <ToolTip label="Zoom presets"><DropdownMenu.Root><DropdownMenu.Trigger asChild><button aria-label="Zoom preset" className="motion-hover flex h-8 min-w-14 items-center justify-center gap-1 rounded-md px-1 text-xs font-bold tabular-nums text-zinc-200 hover:bg-white/10"><span>{Math.round(scale * 100)}%</span><ChevronDown size={12} /></button></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content className="z-50 min-w-28 rounded-lg bg-zinc-900 p-1 shadow-xl ring-1 ring-white/10" align="center" sideOffset={5}><DropdownMenu.Item onClick={() => setScale(1)} className="cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">Fit to width</DropdownMenu.Item>{[0.75, 1, 1.25, 1.5, 2].map(preset => <DropdownMenu.Item key={preset} onClick={() => setScale(preset)} className="cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">{Math.round(preset * 100)}%</DropdownMenu.Item>)}</DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root></ToolTip>
-              <ToolTip label="Zoom in"><button aria-label="Zoom In" onClick={() => setScale(s => Math.min(s + 0.2, 2.5))} className={TOOLBAR_BUTTON}><ZoomIn size={15} /></button></ToolTip>
-              <ToolTip label="Fit to width"><button aria-label="Fit to width" onClick={() => setScale(1)} className={`${TOOLBAR_BUTTON} ${scale === 1 ? 'bg-white/10 text-white' : ''}`}><RotateCcw size={15} /></button></ToolTip>
-              {isPdf && <><ToolTip label={isSearchOpen ? "Close search" : "Search document"}><button aria-label={isSearchOpen ? "Close document search" : "Open document search"} onClick={() => setIsSearchOpen(open => !open)} className={`${TOOLBAR_BUTTON} ${isSearchOpen ? 'bg-white/10 text-white' : ''}`}><Search size={15} /></button></ToolTip>{isSearchOpen && <div className="flex items-center gap-0.5"><input ref={searchInputRef} autoFocus aria-label="Search document text" value={pdfSearch.query} onChange={(event) => pdfSearch.setQuery(event.target.value)} placeholder="Find" className="motion-focus h-8 w-24 rounded-md border-0 bg-white/10 px-2 text-xs text-white outline-none placeholder:text-zinc-500 sm:w-36" /><span aria-live="polite" className="w-9 text-center text-[10px] tabular-nums text-zinc-400">{pdfSearch.isSearching ? '…' : pdfSearch.query ? `${pdfSearch.matches.length ? pdfSearch.activeIndex + 1 : 0}/${pdfSearch.matches.length}` : ''}</span><button aria-label="Previous search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('prev')} className={TOOLBAR_BUTTON}><ChevronLeft size={14} /></button><button aria-label="Next search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('next')} className={TOOLBAR_BUTTON}><ChevronRight size={14} /></button></div>}</>}
-              {isPdf && <><ToolTip label="Previous page"><button aria-label="Previous Page" onClick={() => changePage(-1)} disabled={currentPage <= 1} className={TOOLBAR_BUTTON}><ChevronLeft size={15} /></button></ToolTip><form onSubmit={submitPageJump} className="flex items-center"><input aria-label="Jump to page" value={pageJump} onChange={event => setPageJump(event.target.value.replace(/[^0-9]/g, ''))} onBlur={commitPageJump} className="h-8 w-9 rounded-md border-0 bg-white/10 text-center text-xs font-bold tabular-nums text-white outline-none focus:bg-white/20" /><span className="px-1 text-xs text-zinc-500">/ {numPages || '—'}</span></form><ToolTip label="Next page"><button aria-label="Next Page" onClick={() => changePage(1)} disabled={currentPage >= numPages} className={TOOLBAR_BUTTON}><ChevronRight size={15} /></button></ToolTip></>}
+            <span className="mx-1 h-5 w-px shrink-0 bg-white/15" />
+            {canZoom && <div className="flex shrink-0 items-center gap-0.5">
+              <ToolTip label="Zoom out (Ctrl + -)"><button aria-label="Zoom Out" onClick={() => setScale(s => Math.max(s - 0.2, 0.6))} className={TOOLBAR_BUTTON}><ZoomOut size={15} /></button></ToolTip>
+              <ToolTip label="Zoom presets"><DropdownMenu.Root><DropdownMenu.Trigger asChild><button aria-label="Zoom preset" className="motion-hover flex h-8 min-w-14 items-center justify-center gap-1 rounded-md px-1 text-xs font-bold tabular-nums text-zinc-200 hover:bg-white/10"><span>{Math.round(scale * 100)}%</span><ChevronDown size={12} /></button></DropdownMenu.Trigger><DropdownMenu.Portal><DropdownMenu.Content className="z-50 min-w-32 rounded-lg bg-zinc-900 p-1 shadow-xl ring-1 ring-white/10" align="center" sideOffset={5}><DropdownMenu.Item onClick={() => setScale(1)} className="cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">Fit to width</DropdownMenu.Item>{[0.5, 0.75, 1, 1.5, 2].map(preset => <DropdownMenu.Item key={preset} onClick={() => setScale(preset)} className="cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">{Math.round(preset * 100)}%</DropdownMenu.Item>)}</DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root></ToolTip>
+              <ToolTip label="Zoom in (Ctrl + +)"><button aria-label="Zoom In" onClick={() => setScale(s => Math.min(s + 0.2, 2.5))} className={TOOLBAR_BUTTON}><ZoomIn size={15} /></button></ToolTip>
+              <ToolTip label="Fit to width"><button aria-label="Fit to width" onClick={() => setScale(1)} className={`${TOOLBAR_BUTTON} ${scale === 1 ? 'bg-indigo-500/10 text-indigo-300' : ''}`}><RotateCcw size={15} /></button></ToolTip>
+            </div>}
+            <span className="mx-1 h-5 w-px shrink-0 bg-white/15" />
+            <div className="flex min-w-0 shrink-0 items-center gap-0.5">
+              {isPdf && <><ToolTip label={isSearchOpen ? "Close search" : "Find in document (Ctrl + F)"}><button aria-label={isSearchOpen ? "Close document search" : "Open document search"} onClick={() => setIsSearchOpen(open => !open)} className={`${TOOLBAR_BUTTON} ${isSearchOpen ? 'bg-indigo-500/10 text-indigo-300' : ''}`}><Search size={15} /></button></ToolTip>{isSearchOpen && <div className="flex items-center gap-0.5"><input ref={searchInputRef} autoFocus aria-label="Search document text" value={pdfSearch.query} onChange={(event) => pdfSearch.setQuery(event.target.value)} placeholder="Find" className="motion-focus h-8 w-24 rounded-md border border-white/10 bg-white/10 px-2 text-xs text-white outline-none placeholder:text-zinc-500 sm:w-36" /><span aria-live="polite" className="w-9 text-center text-[10px] tabular-nums text-zinc-400">{pdfSearch.isSearching ? '…' : pdfSearch.query ? `${pdfSearch.matches.length ? pdfSearch.activeIndex + 1 : 0}/${pdfSearch.matches.length}` : ''}</span><button aria-label="Previous search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('prev')} className={TOOLBAR_BUTTON}><ChevronLeft size={14} /></button><button aria-label="Next search result" disabled={!pdfSearch.matches.length} onClick={() => navigateSearch('next')} className={TOOLBAR_BUTTON}><ChevronRight size={14} /></button></div>}</>}
               <ToolTip label={isReadingDark ? "Light page mode" : "Dark page mode"}><button aria-label={isReadingDark ? "Use light page mode" : "Use dark page mode"} aria-pressed={isReadingDark} onClick={() => setIsReadingDark(value => !value)} className={TOOLBAR_BUTTON}>{isReadingDark ? <Sun size={15} /> : <Moon size={15} />}</button></ToolTip>
               <ToolTip label="Print"><button aria-label="Print document" onClick={handlePrint} className={TOOLBAR_BUTTON}><Printer size={15} /></button></ToolTip>
               <ToolTip label="Download"><a aria-label="Download document" href={buildDownloadHref(documentMeta.file_url, documentMeta.title)} onClick={handleDownloadClick} className={TOOLBAR_BUTTON}><Download size={15} /></a></ToolTip>
-              <ToolTip label="Copy link to page"><button aria-label="Copy link to page" onClick={handleCopyLink} className={TOOLBAR_BUTTON}>{copied ? <Check size={15} /> : <LinkIcon size={15} />}</button></ToolTip>
-            </div>}
+              <DropdownMenu.Root><ToolTip label="Share"><DropdownMenu.Trigger asChild><button aria-label="Share document" className={TOOLBAR_BUTTON}><Share2 size={16} /></button></DropdownMenu.Trigger></ToolTip><DropdownMenu.Portal><DropdownMenu.Content className="z-50 min-w-36 overflow-hidden rounded-lg bg-zinc-900 p-1 shadow-xl ring-1 ring-white/10" align="end" sideOffset={6}><DropdownMenu.Item onClick={handleCopyLink} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">{copied ? <Check size={14} className="text-emerald-400" /> : <LinkIcon size={14} />}{copied ? 'Copied' : 'Copy link'}</DropdownMenu.Item><DropdownMenu.Item onClick={handleWhatsAppShare} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-emerald-400 outline-none hover:bg-white/10">WhatsApp</DropdownMenu.Item></DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
+              {isFullscreen && <>
+                <span className="mx-1 h-5 w-px shrink-0 bg-white/15" />
+                <ToolTip label="Toggle minimap"><button aria-pressed={isMinimapOpen} aria-label="Toggle minimap" onClick={() => setIsMinimapOpen(open => !open)} className={`${TOOLBAR_BUTTON} ${isMinimapOpen ? 'bg-indigo-500/10 text-indigo-300' : ''}`}><Map size={16} /></button></ToolTip>
+                <ToolTip label="Toggle bookmarks"><button aria-pressed={isAnnotationsOpen} aria-label="Toggle bookmarks" onClick={() => { setIsAnnotationsOpen(open => !open); setIsOutlineOpen(false); }} className={`${TOOLBAR_BUTTON} ${isAnnotationsOpen ? 'bg-indigo-500/10 text-indigo-300' : ''}`}><Bookmark size={16} /></button></ToolTip>
+                <ToolTip label="Highlight text"><button aria-pressed={annotationTool === 'highlight'} aria-label="Highlight text" onClick={() => setAnnotationTool(tool => tool === 'highlight' ? 'none' : 'highlight')} className={`${TOOLBAR_BUTTON} ${annotationTool === 'highlight' ? 'bg-amber-400/20 text-amber-300' : ''}`}><Highlighter size={16} /></button></ToolTip>
+                <ToolTip label="Add sticky note"><button aria-pressed={annotationTool === 'note'} aria-label="Add sticky note" onClick={() => setAnnotationTool(tool => tool === 'note' ? 'none' : 'note')} className={`${TOOLBAR_BUTTON} ${annotationTool === 'note' ? 'bg-amber-400/20 text-amber-300' : ''}`}><StickyNote size={16} /></button></ToolTip>
+                <ToolTip label="Draw with pen"><button aria-pressed={annotationTool === 'pen'} aria-label="Draw with pen" onClick={() => setAnnotationTool(tool => tool === 'pen' ? 'none' : 'pen')} className={`${TOOLBAR_BUTTON} ${annotationTool === 'pen' ? 'bg-indigo-400/20 text-indigo-300' : ''}`}><PenLine size={16} /></button></ToolTip>
+                <ToolTip label="Split view (coming soon)"><button aria-label="Split view (coming soon)" disabled className={TOOLBAR_BUTTON}><Columns3 size={16} /></button></ToolTip>
+                <ToolTip label="Show keyboard shortcuts"><button aria-pressed={isShortcutsOpen} aria-label="Show keyboard shortcuts" onClick={() => setIsShortcutsOpen(open => !open)} className={TOOLBAR_BUTTON}><Keyboard size={16} /></button></ToolTip>
+                <ToolTip label="Exit fullscreen"><button ref={fullscreenTriggerRef} aria-label="Exit fullscreen reader" onClick={exitFullscreen} className={`${TOOLBAR_BUTTON} text-indigo-300`}><Minimize size={16} /></button></ToolTip>
+              </>}
+              {!isFullscreen && (canZoom ? <ToolTip label="Fullscreen"><button ref={fullscreenTriggerRef} aria-label="Open in fullscreen reader" onClick={() => setIsFullscreen(true)} className={`${TOOLBAR_BUTTON} text-indigo-300`}><Maximize size={16} /></button></ToolTip> : <ToolTip label="Open file"><a aria-label="Open file" href={documentMeta.file_url} target="_blank" rel="noopener noreferrer" onClick={handleOpenFile} className={`${TOOLBAR_BUTTON} text-indigo-300`}><Maximize size={16} /></a></ToolTip>)}
+            </div>
           </header>
-
-          {isPdf && <div className="flex h-5 shrink-0 items-center bg-zinc-950 px-3" aria-label="Reading progress"><input aria-label="Page progress" type="range" min="1" max={Math.max(1, numPages)} value={currentPage} onChange={(event) => goToPage(Number(event.target.value))} className="h-1 w-full accent-indigo-400" /><span className="sr-only">Page {currentPage} of {numPages}</span></div>}
+          {!isFullscreen && isPdf && <div className="flex h-5 shrink-0 items-center bg-zinc-950 px-3" aria-label="Reading progress"><input aria-label="Page progress" type="range" min="1" max={Math.max(1, numPages)} value={currentPage} onChange={(event) => goToPage(Number(event.target.value))} className="h-1 w-full accent-indigo-400" /><span className="sr-only">Page {currentPage} of {numPages}</span></div>}
         </Tooltip.Provider>
 
-        {isFullscreen && (
-          <>
-            <nav aria-label="Document breadcrumb" className="hidden sticky top-0 z-10 shrink-0 items-center gap-2 border-b border-border bg-surface px-4 py-2 text-xs font-semibold text-muted md:flex">
-              <BookOpen size={14} aria-hidden="true" />
-              <span>Documents</span><span aria-hidden="true">/</span><span className="truncate text-foreground">{documentMeta.title}</span>
-            </nav>
-            <div className="flex shrink-0 items-center justify-end gap-1 bg-zinc-900 px-3 py-1">
-              <button aria-pressed={isMinimapOpen} aria-label="Toggle minimap" onClick={() => setIsMinimapOpen(open => !open)} className="motion-hover rounded-md p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><Map size={16} /></button>
-              <button aria-pressed={isOutlineOpen} aria-label="Toggle document outline" onClick={() => { setIsOutlineOpen(open => !open); setIsAnnotationsOpen(false); }} className="motion-hover rounded-md p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><PanelLeft size={16} /></button>
-              <button aria-pressed={annotationTool === 'highlight'} aria-label="Highlight text" onClick={() => setAnnotationTool(tool => tool === 'highlight' ? 'none' : 'highlight')} className={`${TOOLBAR_BUTTON} ${annotationTool === 'highlight' ? 'bg-amber-400/20 text-amber-300' : ''}`}><Highlighter size={16} /></button>
-              <button aria-pressed={annotationTool === 'note'} aria-label="Add sticky note" onClick={() => setAnnotationTool(tool => tool === 'note' ? 'none' : 'note')} className={`${TOOLBAR_BUTTON} ${annotationTool === 'note' ? 'bg-amber-400/20 text-amber-300' : ''}`}><StickyNote size={16} /></button>
-              <button aria-pressed={annotationTool === 'pen'} aria-label="Draw with pen" onClick={() => setAnnotationTool(tool => tool === 'pen' ? 'none' : 'pen')} className={`${TOOLBAR_BUTTON} ${annotationTool === 'pen' ? 'bg-indigo-400/20 text-indigo-300' : ''}`}><PenLine size={16} /></button>
-              <button aria-label="Toggle bookmarks" onClick={() => setIsAnnotationsOpen(open => !open)} className="motion-hover rounded-md p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><Bookmark size={16} /></button>
-              <button aria-label="Split view (coming soon)" disabled className="motion-hover rounded-lg p-2 text-muted opacity-50"><Columns3 size={16} /></button>
-              <button aria-pressed={isShortcutsOpen} aria-label="Show keyboard shortcuts" onClick={() => setIsShortcutsOpen(open => !open)} className="motion-hover rounded-lg p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><Keyboard size={16} /></button>
-              <button aria-label="Exit fullscreen reader" onClick={exitFullscreen} className="motion-hover rounded-lg p-2 text-zinc-300 hover:bg-white/10 hover:text-white"><Minimize size={16} /></button>
-            </div>
-          </>
-        )}
+        {isFullscreen && <nav aria-label="Document breadcrumb" className={`absolute left-4 top-4 z-10 hidden items-center gap-2 rounded-lg bg-black/30 px-3 py-2 text-xs font-semibold text-white/70 backdrop-blur-sm transition-opacity duration-300 md:flex ${isHudVisible ? 'opacity-100' : 'opacity-0'}`}><BookOpen size={14} aria-hidden="true" /><span>Documents</span><span aria-hidden="true">/</span><span className="truncate">{documentMeta.title}</span></nav>}
 
         {resumedAt !== null && (
           <div role="status" className="flex shrink-0 flex-wrap items-center justify-center gap-1 border-b border-border bg-primary/5 px-4 py-2">

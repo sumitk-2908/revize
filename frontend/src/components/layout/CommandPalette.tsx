@@ -74,7 +74,7 @@ export const CommandPalette = ({ open, onOpenChange, isMac }: { open: boolean; o
     {
       id: "quick-upload",
       label: "Upload",
-      description: "Contribute notes, PYQs, or syllabus PDFs",
+      description: "Upload notes, PYQs, or syllabus PDFs",
       section: "Quick Actions",
       icon: <Upload size={16} className="text-success" aria-hidden="true" />,
       action: () => { closePalette(); requestUploadPrompt(); },

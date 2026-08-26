@@ -25,7 +25,7 @@ const SearchTrigger = forwardRef<HTMLButtonElement, { onOpen: () => void; isMac:
       type="button"
       onClick={onOpen}
       aria-haspopup="dialog"
-      className="motion-hover motion-active flex h-9 w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface-hover px-3 text-left text-muted shadow-sm hover:bg-surface hover:text-foreground md:h-10 md:max-w-md lg:max-w-xl"
+      className="motion-hover motion-active flex h-9 w-full items-center justify-between gap-2 rounded-full border border-border bg-surface-hover px-3 text-left text-muted shadow-sm hover:bg-surface hover:text-foreground md:h-10 md:max-w-md md:rounded-xl lg:max-w-xl"
       {...props}
     >
       <span className="flex min-w-0 items-center gap-2">
@@ -79,15 +79,15 @@ export const TopBar = () => {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur-xl">
-      <div className="mx-auto flex min-h-14 w-full max-w-[1600px] flex-wrap items-center justify-between gap-2 px-3 py-2 md:min-h-16 md:flex-nowrap md:gap-4 md:px-6 md:py-0">
+      <div className="mx-auto flex min-h-14 w-full max-w-[1600px] items-center gap-2 px-2 py-2 md:min-h-16 md:gap-4 md:px-6 md:py-0">
 
         <div className="flex shrink-0 items-center gap-2.5">
           <button
             aria-label={sidebarCollapsed ? "Open sidebar" : "Close sidebar"}
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="group relative flex items-center gap-2.5 text-left w-full sm:w-auto"
+            className="group relative flex w-auto items-center gap-2.5 text-left"
           >
-            <div className="relative flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-colors group-hover:bg-surface-hover group-hover:text-foreground">
+            <div className="relative flex size-9 items-center justify-center rounded-xl bg-transparent text-foreground transition-colors group-hover:bg-surface-hover md:bg-primary md:text-primary-foreground md:shadow-sm md:group-hover:bg-surface-hover md:group-hover:text-foreground">
               <GraduationCap size={20} className="absolute transition-opacity duration-200 opacity-100 group-hover:opacity-0" />
               <div className="absolute transition-opacity duration-200 opacity-0 group-hover:opacity-100 flex items-center justify-center">
                 {sidebarCollapsed ? <PanelLeft size={20} /> : <PanelLeftClose size={20} />}
@@ -102,19 +102,19 @@ export const TopBar = () => {
           </button>
         </div>
 
-        <div className="order-3 flex w-full min-w-0 justify-center md:order-none md:flex-1">
+        <div className="flex min-w-0 flex-1 justify-center">
           <DiscoveryTooltip featureKey="command_palette" text="Quickly find subjects, modules, or documents" side="bottom">
             <SearchTrigger onOpen={() => setIsCommandOpen(true)} isMac={isMac} />
           </DiscoveryTooltip>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <button aria-label="Toggle theme" onClick={toggleTheme} className="motion-hover motion-active flex size-9 items-center justify-center rounded-xl border border-border text-foreground hover:bg-surface-hover">
+          <button aria-label="Toggle theme" onClick={toggleTheme} className="motion-hover motion-active hidden size-9 items-center justify-center rounded-xl border border-border text-foreground hover:bg-surface-hover md:flex">
             {mounted ? (isDarkMode ? <Sun size={18} /> : <Moon size={18} />) : <Moon size={18} className="text-muted opacity-50" />}
           </button>
 
           {(isAdmin || isStudent) && (
-            <div className="relative">
+            <div className="relative hidden md:block">
               <button
                 aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
                 aria-haspopup="dialog"
@@ -186,7 +186,7 @@ export const TopBar = () => {
             <div className="flex items-center gap-3">
               <DiscoveryTooltip featureKey="upload_button" text="Share your notes and help others" side="bottom" align="end">
                 <button
-                  aria-label={isAdmin ? "Upload a document" : "Contribute a document"}
+                  aria-label="Upload a document"
                   onClick={() => {
                     if (isAdmin || userProfile.full_name) {
                       setShowUploadForm(true);
@@ -194,9 +194,9 @@ export const TopBar = () => {
                       setShowProfileGate(true);
                     }
                   }}
-                  className="motion-hover motion-active flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground hover:opacity-90 sm:px-4"
+                  className="motion-hover motion-active flex h-9 items-center gap-2 rounded-full bg-primary px-3 text-xs font-bold text-primary-foreground hover:opacity-90 sm:rounded-xl sm:px-4"
                 >
-                  <Plus size={14} aria-hidden="true" /> <span>{isAdmin ? "Upload" : "Contribute"}</span>
+                  <Plus size={14} aria-hidden="true" /> <span>Upload</span>
                 </button>
               </DiscoveryTooltip>
               <div className="hidden sm:block">
@@ -206,11 +206,11 @@ export const TopBar = () => {
           ) : (
             <DiscoveryTooltip featureKey="upload_button" text="Share your notes and help others" side="bottom" align="end">
               <button
-                aria-label="Contribute a document"
+                aria-label="Upload a document"
                 onClick={() => openAuthPrompt("upload")}
-                className="motion-hover motion-active flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 sm:px-4"
+                className="motion-hover motion-active flex h-9 items-center gap-2 rounded-full bg-primary px-3 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 sm:rounded-xl sm:px-4"
               >
-                <Plus size={14} aria-hidden="true" /> <span>Contribute</span>
+                <Plus size={14} aria-hidden="true" /> <span>Upload</span>
               </button>
             </DiscoveryTooltip>
           )}
