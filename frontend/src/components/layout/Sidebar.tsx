@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Home, Inbox, Clock, Bookmark, Upload, ClipboardList } from "lucide-react";
+import { AnalyticsSidebar } from "@/components/layout/AnalyticsSidebar";
 import { useSidebar } from "@/app/context/SidebarContext";
 import { useAuth } from "@/app/context/AuthContext";
 import ProfileSidebarCard from "@/components/profile/ProfileSidebarCard";
@@ -108,6 +109,10 @@ export const SidebarNavigation = () => {
           >
             <ClipboardList size={18} /> {!sidebarCollapsed && "Requests"}
           </Link>
+        </div>
+
+        <div className="mt-6 border-t border-border pt-5">
+          <AnalyticsSidebar />
         </div>
 
       </>

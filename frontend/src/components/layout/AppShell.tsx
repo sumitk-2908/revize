@@ -2,7 +2,6 @@
 
 import React from "react";
 import { usePathname } from "next/navigation";
-import { AnalyticsSidebar } from "@/components/layout/AnalyticsSidebar";
 import { PageEnter } from "@/components/ui/Motion";
 
 export const AppShell = ({ children }: { children: React.ReactNode }) => (
@@ -20,7 +19,6 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => (
 export const ShellContent = ({ children }: { children: React.ReactNode }) => (
   <div className="mx-auto flex w-full max-w-[1600px] flex-1">
     {children}
-    <AnalyticsSidebar />
   </div>
 );
 

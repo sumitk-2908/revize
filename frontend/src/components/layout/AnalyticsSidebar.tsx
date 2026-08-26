@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { BarChart2, Download, Eye, FileUp, PanelRight, TrendingUp } from "lucide-react";
 import { supabase } from "@/app/lib/api/core";
+import { useSidebar } from "@/app/context/SidebarContext";
 import { getTrendingDocuments } from "@/app/lib/api/analytics";
 import { documentHref, SearchDocument } from "@/components/layout/utils";
 
@@ -16,6 +17,7 @@ interface AnalyticsStats {
 const defaultStats: AnalyticsStats = { views: 0, downloads: 0, uploads: 0 };
 
 export const AnalyticsSidebar = () => {
+    const { sidebarCollapsed } = useSidebar();
     const [isOpen, setIsOpen] = useState(true);
     const [stats, setStats] = useState<AnalyticsStats>(defaultStats);
     const [trendingDocs, setTrendingDocs] = useState<SearchDocument[]>([]);
@@ -63,23 +65,21 @@ export const AnalyticsSidebar = () => {
     }, []);
 
     return (
-        <aside
-            aria-label="Public analytics"
-            className={`motion-sidebar sticky top-16 hidden h-[calc(100vh-4rem)] shrink-0 flex-col overflow-y-auto border-l border-border bg-background py-6 lg:flex ${isOpen ? "w-[260px] px-4" : "w-16 px-2"}`}
-        >
+        <section aria-label="Public analytics" className="space-y-3">
             <button
                 type="button"
+                title={sidebarCollapsed ? "Analytics" : undefined}
                 aria-label={isOpen ? "Collapse analytics panel" : "Open analytics panel"}
                 aria-expanded={isOpen}
                 onClick={() => setIsOpen((open) => !open)}
                 className="motion-hover motion-active mb-6 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-muted transition-colors hover:bg-surface-hover hover:text-primary"
             >
                 <BarChart2 size={18} className="shrink-0" />
-                {isOpen && <span>Analytics</span>}
-                {isOpen && <PanelRight size={16} className="ml-auto" />}
+                {!sidebarCollapsed && isOpen && <span>Analytics</span>}
+                {!sidebarCollapsed && isOpen && <PanelRight size={16} className="ml-auto" />}
             </button>
 
-            {isOpen && (
+            {!sidebarCollapsed && isOpen && (
                 <div className="space-y-6">
                     <section aria-labelledby="analytics-stats-heading">
                         <p id="analytics-stats-heading" className="px-3 pb-2 text-xs font-bold tracking-[0.06em] text-muted uppercase">Public impact</p>
@@ -115,7 +115,7 @@ export const AnalyticsSidebar = () => {
                     </section>
                 </div>
             )}
-        </aside>
+        </section>
     );
 };
 

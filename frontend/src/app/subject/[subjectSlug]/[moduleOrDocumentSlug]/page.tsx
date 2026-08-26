@@ -1,5 +1,5 @@
 import { getCachedSubjectBySlug } from "@/app/lib/api/cached-subjects";
-import { normalizeTitle } from "@/app/lib/subject-config";
+import { normalizeSubjectTitle, normalizeTitle } from "@/app/lib/subject-config";
 import Link from "next/link";
 import { ArrowLeft, FileText } from "lucide-react";
 import DocumentInteractiveGrid from "@/components/subject/DocumentInteractiveGrid";
@@ -75,7 +75,7 @@ export default async function ModulePage({
 
   const dbSubject = await getCachedSubjectBySlug(subjectSlug).catch(() => null);
 
-  const subjectDisplayName = normalizeTitle(dbSubject?.name || subjectQueryName);
+  const subjectDisplayName = normalizeSubjectTitle(dbSubject?.name || subjectQueryName);
 
   const { data: documents, total: count } = await getPaginatedDocumentsByModule(
     moduleNumber,

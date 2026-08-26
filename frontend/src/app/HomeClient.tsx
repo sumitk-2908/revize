@@ -118,14 +118,6 @@ export default function HomeClient({ initialSubjects, counts, branches }: HomeCl
               </h1>
               {firstName && <span className="hidden text-sm text-muted sm:inline">· Welcome back, {firstName}</span>}
             </div>
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
-              aria-haspopup="dialog"
-              className="motion-hover motion-active inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-border bg-transparent px-3 text-sm font-semibold text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
-            >
-              Search documents <span className="font-mono text-xs">⌘K</span>
-            </button>
           </motion.section>
         )}
       </AnimatePresence>

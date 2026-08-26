@@ -1,6 +1,6 @@
 import { supabase } from "@/app/lib/api/core";
 import { getCachedSubjectBySlug, getCachedModules, getCachedModuleCounts, getCachedBranches } from "@/app/lib/api/cached-subjects";
-import { getYearLabel, normalizeTitle } from "@/app/lib/subject-config";
+import { getYearLabel, normalizeSubjectTitle, normalizeTitle } from "@/app/lib/subject-config";
 import SubjectTabs from "@/components/subject/SubjectTabs";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { Metadata } from "next";
@@ -54,7 +54,7 @@ async function SubjectTabsFetcher({ subjectSlug }: { subjectSlug: string }) {
     <>
       <div className="rounded-3xl border border-border bg-surface px-6 py-4 shadow-sm">
         <h1 className="text-2xl font-extrabold tracking-tight sm:text-4xl">
-          {normalizeTitle(dbSubject.name)}
+          {normalizeSubjectTitle(dbSubject.name)}
         </h1>
         {offerings.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">

@@ -45,6 +45,11 @@ export function normalizeTitle(value: string) {
   });
 }
 
+/** Render subject names in the catalogue's canonical uppercase format. */
+export function normalizeSubjectTitle(value: string) {
+  return normalizeTitle(value).toUpperCase();
+}
+
 // Academic years a subject can be offered in, and that a student can belong to.
 export const ACADEMIC_YEARS = [
   { value: 1, label: "1st year" },
@@ -64,7 +69,7 @@ export const SUBJECT_UI_MAP: Record<string, any> = {
   "maths-1": { icon: Calculator, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
   "maths-2": { icon: Calculator, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
   "pps": { title: "PPS", icon: Terminal, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
-  "dm": { title: "Discrete Mathematics", icon: Calculator, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
+  "dm": { title: "DM", icon: Calculator, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
   "communication-skills": { icon: MessageSquare, color: "text-primary", bg: "bg-primary/10", hoverBg: "group-hover:bg-primary", border: "border-primary", topBar: "bg-primary" },
 
   "biology": { icon: Leaf, color: "text-success", bg: "bg-success/10", hoverBg: "group-hover:bg-success", border: "border-success", topBar: "bg-success" },

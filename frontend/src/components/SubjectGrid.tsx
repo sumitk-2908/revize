@@ -7,7 +7,7 @@ import { ACADEMIC_YEARS, getYearLabel } from "@/app/lib/subject-config";
 import { resolveSubjectDesign, spanClass } from "@/app/lib/subject-design";
 import SubjectCard from "@/components/subject/SubjectCard";
 import { CardGrid, EmptyState } from "@/components/layout/SharedLayouts";
-import { BookOpen, Upload, Filter, X } from "lucide-react";
+import { BookOpen, Upload } from "lucide-react";
 import { requestUploadPrompt } from "@/app/lib/student-prompts";
 
 interface SubjectGridProps {
@@ -55,49 +55,35 @@ export default function SubjectGrid({ subjects, subjectCounts, branches, default
 
   return (
     <>
-      <div className="mb-6 flex h-10 min-w-0 items-center gap-2 overflow-x-auto hide-scrollbar">
-        <Filter size={15} className="shrink-0 text-muted" aria-hidden="true" />
-        <span className="shrink-0 text-xs font-bold text-muted">Branch</span>
-        <button
-          type="button"
-          onClick={() => setBranchOverride({ value: null })}
-          aria-pressed={branchId === null}
-          className={`motion-hover motion-active shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${branchId === null ? "bg-primary text-white" : "bg-surface-hover text-muted hover:text-foreground"}`}
-        >
-          All branches
-        </button>
-        {branches.map((branch) => (
-          <button
-            key={branch.id}
-            type="button"
-            onClick={() => setBranchOverride({ value: branch.id })}
-            aria-pressed={branchId === branch.id}
-            className={`motion-hover motion-active shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${branchId === branch.id ? "bg-primary text-white" : "bg-surface-hover text-muted hover:text-foreground"}`}
+      <div className="mb-6 grid grid-cols-2 gap-3">
+        <label className="min-w-0">
+          <span className="mb-1.5 block text-xs font-bold text-muted">Branch</span>
+          <select
+            aria-label="Filter by branch"
+            value={branchId ?? ""}
+            onChange={(event) => setBranchOverride({ value: event.target.value ? Number(event.target.value) : null })}
+            className="motion-focus h-10 w-full rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-foreground outline-none focus:border-primary"
           >
-            {branch.code}
-          </button>
-        ))}
-        <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-        <span className="shrink-0 text-xs font-bold text-muted">Year</span>
-        <button
-          type="button"
-          onClick={() => setYearOverride({ value: null })}
-          aria-pressed={year === null}
-          className={`motion-hover motion-active shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${year === null ? "bg-primary text-white" : "bg-surface-hover text-muted hover:text-foreground"}`}
-        >
-          All years
-        </button>
-        {ACADEMIC_YEARS.map((academicYear) => (
-          <button
-            key={academicYear.value}
-            type="button"
-            onClick={() => setYearOverride({ value: academicYear.value })}
-            aria-pressed={year === academicYear.value}
-            className={`motion-hover motion-active shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${year === academicYear.value ? "bg-primary text-white" : "bg-surface-hover text-muted hover:text-foreground"}`}
+            <option value="">All branches</option>
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>{branch.code}</option>
+            ))}
+          </select>
+        </label>
+        <label className="min-w-0">
+          <span className="mb-1.5 block text-xs font-bold text-muted">Year</span>
+          <select
+            aria-label="Filter by year"
+            value={year ?? ""}
+            onChange={(event) => setYearOverride({ value: event.target.value ? Number(event.target.value) : null })}
+            className="motion-focus h-10 w-full rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-foreground outline-none focus:border-primary"
           >
-            {academicYear.label}
-          </button>
-        ))}
+            <option value="">All years</option>
+            {ACADEMIC_YEARS.map((academicYear) => (
+              <option key={academicYear.value} value={academicYear.value}>{academicYear.label}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {filteredSubjects.length === 0 ? (

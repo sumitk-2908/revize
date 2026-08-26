@@ -7,7 +7,7 @@ import {
   type CardLayoutKey,
   type ResolvedSubjectDesign,
 } from "@/app/lib/subject-design";
-import { normalizeTitle } from "@/app/lib/subject-config";
+import { normalizeSubjectTitle } from "@/app/lib/subject-config";
 
 export interface SubjectCardProps {
   /** Subject display name. */
@@ -112,24 +112,24 @@ export default function SubjectCard({
         >
           <Icon size={isWide ? 28 : 24} />
         </div>
-        <h2 className={`${isWide ? "mt-6" : "mt-9"} ${titleClass}`}>{normalizeTitle(name)}</h2>
+        <h2 className={`${isWide ? "mt-6" : "mt-9"} ${titleClass}`}>{normalizeSubjectTitle(name)}</h2>
       </>
     ) : layout === "minimal" ? (
       <div className="flex items-center gap-3">
         <span className={`shrink-0 ${theme.icon}`}>
           <Icon size={isWide ? 24 : 20} />
         </span>
-        <h2 className={titleClass}>{normalizeTitle(name)}</h2>
+        <h2 className={titleClass}>{normalizeSubjectTitle(name)}</h2>
       </div>
     ) : isWide ? (
       <div className="flex items-center gap-4">
         {iconTile}
-        <h2 className={titleClass}>{normalizeTitle(name)}</h2>
+        <h2 className={titleClass}>{normalizeSubjectTitle(name)}</h2>
       </div>
     ) : (
       <>
         {iconTile}
-        <h2 className={`mt-4 ${titleClass}`}>{normalizeTitle(name)}</h2>
+        <h2 className={`mt-4 ${titleClass}`}>{normalizeSubjectTitle(name)}</h2>
       </>
     );
 
