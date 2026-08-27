@@ -326,4 +326,10 @@ def extract_text(
     else:
         return None
 
+    if text is None:
+        return None
+
+    # PostgreSQL text/varchar columns reject NUL bytes (0x00).
+    text = text.replace("\x00", "")
+
     return text[:max_chars]

@@ -107,6 +107,20 @@ def test_pdf_text_extraction_is_bounded_for_database_search_index():
     assert len(text) <= MAX_EXTRACTED_TEXT_CHARS
 
 
+def test_pdf_text_extraction_strips_null_bytes():
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "Logic\x00 Proof ¬ ∧ ∨")
+    pdf_bytes = document.tobytes()
+    document.close()
+
+    text = extract_text(spec_for_filename("math-notes.pdf"), pdf_bytes)
+
+    assert text is not None
+    assert "\x00" not in text
+    assert "Logic Proof" in text or "Logic" in text
+
+
 def test_document_storage_key_uses_title_hierarchy_and_sanitizes_segments():
     key = document_storage_key(
         "  Unit 1 / Exam Notes  ",
