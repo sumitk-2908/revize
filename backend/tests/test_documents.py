@@ -379,6 +379,62 @@ async def test_upload_markdown_success(mock_upload_r2, mock_supabase, mock_uploa
     assert mock_upload_r2.call_args[0][0] == "subjects/CS/general/Test Doc.md"
 
 @pytest.mark.asyncio
+@patch("app.routers.documents.delete_from_r2", new_callable=AsyncMock)
+@patch("app.routers.documents.validate_and_store_upload", new_callable=AsyncMock)
+@patch("app.routers.documents.supabase")
+async def test_upload_retries_with_bounded_text_on_tsvector_overflow(
+    mock_supabase,
+    mock_validate_upload,
+    mock_delete_r2,
+    mock_upload_file_text,
+    test_client,
+):
+    from app.routers.documents import CONTENT_SEARCH_FALLBACK_CHARS
+
+    app.dependency_overrides[verify_token] = lambda: {"id": "user123"}
+    extracted_text = "searchable " * 50_000
+    mock_validate_upload.return_value = MagicMock(
+        file_url="https://r2.dev/notes.md",
+        file_size_mb=0.5,
+        page_count=None,
+        thumbnail_url=None,
+        content_text=extracted_text,
+        file_sha256="a" * 64,
+        r2_keys=["notes.md"],
+    )
+
+    admin_query = MagicMock()
+    admin_query.execute.return_value = MagicMock(data=[])
+    admins_table = MagicMock()
+    admins_table.select.return_value.eq.return_value = admin_query
+
+    insert_query = MagicMock()
+    insert_query.execute.side_effect = [
+        Exception("PostgreSQL error: string is too long for tsvector"),
+        MagicMock(data=[{"id": 9, "title": "Large notes"}]),
+    ]
+    documents_table = MagicMock()
+    documents_table.insert.return_value = insert_query
+    mock_supabase.table.side_effect = lambda name: (
+        admins_table if name == "admins" else documents_table
+    )
+
+    response = test_client.post(
+        "/api/v1/documents/upload/",
+        data={"title": "Large notes", "category": "notes", "subject": "CS"},
+        files={"file": mock_upload_file_text},
+    )
+
+    assert response.status_code == 200
+    assert documents_table.insert.call_count == 2
+    first_payload = documents_table.insert.call_args_list[0].args[0]
+    retry_payload = documents_table.insert.call_args_list[1].args[0]
+    assert first_payload["content_text"] == extracted_text
+    assert retry_payload["content_text"] == extracted_text[:CONTENT_SEARCH_FALLBACK_CHARS]
+    mock_delete_r2.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @patch("app.routers.documents.supabase")
 @patch("app.routers.documents.upload_to_r2")
 async def test_upload_docx_success(mock_upload_r2, mock_supabase, mock_upload_file_docx, test_client):

@@ -28,6 +28,10 @@ from typing import Optional
 
 router = APIRouter()
 
+# Keep uploads compatible with databases that still have the original unbounded
+# content_tsv generated column while the bounded schema migration rolls out.
+CONTENT_SEARCH_FALLBACK_CHARS = 200_000
+
 def get_real_ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
@@ -303,6 +307,22 @@ def resolve_fulfilled_request(raw_request_id: Optional[str]) -> Optional[str]:
 # Upload
 # ---------------------------------------------------------------------------
 
+
+def _is_tsvector_overflow(error: Exception) -> bool:
+    """Return whether PostgreSQL rejected the generated content search vector."""
+    return "string is too long for tsvector" in str(error).lower()
+
+
+def _bounded_search_content(payload: dict) -> dict:
+    """Make a retry payload safe for the pre-bounded content_tsv schema."""
+    content_text = payload.get("content_text")
+    if not isinstance(content_text, str) or len(content_text) <= CONTENT_SEARCH_FALLBACK_CHARS:
+        return payload
+    fallback = payload.copy()
+    fallback["content_text"] = content_text[:CONTENT_SEARCH_FALLBACK_CHARS]
+    return fallback
+
+
 @router.post("/upload/")
 @limiter.limit("5/minute")
 async def upload_document(
@@ -375,7 +395,21 @@ async def upload_document(
         }
 
         try:
-            db_response = supabase.table("documents").insert(new_doc_payload).execute()
+            try:
+                db_response = supabase.table("documents").insert(new_doc_payload).execute()
+            except Exception as db_err:
+                # The original generated content_tsv column indexed all extracted
+                # text and can exceed PostgreSQL's ~1 MB tsvector limit.
+                if not _is_tsvector_overflow(db_err):
+                    raise
+                print(
+                    "Database rejected the full content search vector; retrying "
+                    f"with the first {CONTENT_SEARCH_FALLBACK_CHARS} characters."
+                )
+                db_response = supabase.table("documents").insert(
+                    _bounded_search_content(new_doc_payload)
+                ).execute()
+
             if not db_response.data:
                 raise Exception("Supabase DB insert returned empty data.")
             return db_response.data[0]
@@ -385,12 +419,8 @@ async def upload_document(
             print(f"DB insert failed — rolling back R2 uploads: {db_err}")
             await delete_from_r2(stored.r2_keys)
 
-            # Large, highly-compressed PDFs can expand to enough extracted text
-            # to overflow PostgreSQL's generated tsvector even when the PDF is
-            # only a few hundred KB. Keep the normal production response safe,
-            # but tell the user what happened when Postgres identifies that case.
             db_error_text = str(db_err)
-            if "string is too long for tsvector" in db_error_text.lower():
+            if _is_tsvector_overflow(db_err):
                 detail = (
                     "This PDF contains too much searchable text for the database index. "
                     "The upload was rolled back; deploy the bounded content-search migration and retry."
