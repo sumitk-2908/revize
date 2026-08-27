@@ -17,12 +17,14 @@
     </linearGradient>
   </defs>
   <rect x="3" y="3" width="114" height="114" rx="29" fill="url(#teal)"/>
-  <circle cx="60" cy="60" r="43" fill="url(#coral)"/>
-  <path d="M56 30c-7-5-16-3-20 4-8 2-12 9-10 17-6 5-7 12-2 16-3 8 1 15 9 18 3 8 11 11 19 7 5 4 11 4 16 0 9 3 17-2 19-10 8-2 12-10 8-18 5-6 3-14-3-18 2-8-2-16-9-19-4-7-13-9-20-5-6-5-13-6-19-2Z" fill="#fffefe" stroke="#151515" stroke-width="4.5" stroke-linejoin="round"/>
-  <path d="M60 30v63" stroke="#151515" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="45" cy="62" r="4.5" fill="#151515"/>
-  <circle cx="75" cy="62" r="4.5" fill="#151515"/>
-  <path d="M49 76c7 6 15 6 22 0" stroke="#151515" stroke-width="4" stroke-linecap="round"/>
-  <path d="m83 34 2.5 6 6 2.5-6 2.5-2.5 6-2.5-6-6-2.5 6-2.5 2.5-6Z" fill="url(#gold)" stroke="#151515" stroke-width="2"/>
-  <path d="m33 42 1.8 4.2 4.2 1.8-4.2 1.8L33 54l-1.8-4.2L27 48l4.2-1.8L33 42Z" fill="url(#gold)" stroke="#151515" stroke-width="1.7"/>
+  <g transform="translate(60 60) scale(0.88) translate(-60 -60)">
+    <circle cx="60" cy="60" r="43" fill="url(#coral)"/>
+    <path d="M56 30c-7-5-16-3-20 4-8 2-12 9-10 17-6 5-7 12-2 16-3 8 1 15 9 18 3 8 11 11 19 7 5 4 11 4 16 0 9 3 17-2 19-10 8-2 12-10 8-18 5-6 3-14-3-18 2-8-2-16-9-19-4-7-13-9-20-5-6-5-13-6-19-2Z" fill="#fffefe" stroke="#151515" stroke-width="4.5" stroke-linejoin="round"/>
+    <path d="M60 30v63" stroke="#151515" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="45" cy="62" r="4.5" fill="#151515"/>
+    <circle cx="75" cy="62" r="4.5" fill="#151515"/>
+    <path d="M49 76c7 6 15 6 22 0" stroke="#151515" stroke-width="4" stroke-linecap="round"/>
+    <path d="m83 34 2.5 6 6 2.5-6 2.5-2.5 6-2.5-6-6-2.5 6-2.5 2.5-6Z" fill="url(#gold)" stroke="#151515" stroke-width="2"/>
+    <path d="m33 42 1.8 4.2 4.2 1.8-4.2 1.8L33 54l-1.8-4.2L27 48l4.2-1.8L33 42Z" fill="url(#gold)" stroke="#151515" stroke-width="1.7"/>
+  </g>
 </svg>

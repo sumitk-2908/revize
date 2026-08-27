@@ -18,7 +18,13 @@ from typing import Optional
 import fitz
 
 MB = 1024 * 1024
-MAX_EXTRACTED_TEXT_CHARS = 500_000
+
+# PostgreSQL's tsvector representation is limited to roughly 1MB. A PDF can be
+# tiny on disk yet expand to hundreds of thousands of extracted characters, and
+# non-ASCII text can take up to four UTF-8 bytes per character. Keep the upload
+# path comfortably below that database limit; the generated-column migration
+# applies the same bound independently for existing/backfilled rows.
+MAX_EXTRACTED_TEXT_CHARS = 200_000
 
 # A PDF that yields less than this after stripping whitespace has no usable
 # text layer — a scan, or slides exported as images — and is worth OCR'ing.

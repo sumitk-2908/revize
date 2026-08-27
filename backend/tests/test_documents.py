@@ -2,11 +2,13 @@ import io
 import zipfile
 import hashlib
 
+import fitz
 import pytest
 from fastapi import HTTPException, UploadFile
 from unittest.mock import patch, MagicMock, AsyncMock
 from app.main import app
 from app.auth import verify_token, verify_admin
+from app.file_types import MAX_EXTRACTED_TEXT_CHARS, extract_text, spec_for_filename
 from app.storage import document_storage_key
 from app.routers.documents import validate_and_store_upload
 
@@ -91,6 +93,19 @@ def _mock_duplicate_lookup(mock_supabase, rows):
 def clear_overrides():
     yield
     app.dependency_overrides.clear()
+
+def test_pdf_text_extraction_is_bounded_for_database_search_index():
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "searchable " * 30_000)
+    pdf_bytes = document.tobytes()
+    document.close()
+
+    text = extract_text(spec_for_filename("large-text-layer.pdf"), pdf_bytes)
+
+    assert text is not None
+    assert len(text) <= MAX_EXTRACTED_TEXT_CHARS
+
 
 def test_document_storage_key_uses_title_hierarchy_and_sanitizes_segments():
     key = document_storage_key(

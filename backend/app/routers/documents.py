@@ -384,7 +384,24 @@ async def upload_document(
             # ROLLBACK: remove the files we just uploaded so R2 doesn't accumulate orphans.
             print(f"DB insert failed — rolling back R2 uploads: {db_err}")
             await delete_from_r2(stored.r2_keys)
-            raise HTTPException(status_code=500, detail="Database insert failed. Upload rolled back.")
+
+            # Large, highly-compressed PDFs can expand to enough extracted text
+            # to overflow PostgreSQL's generated tsvector even when the PDF is
+            # only a few hundred KB. Keep the normal production response safe,
+            # but tell the user what happened when Postgres identifies that case.
+            db_error_text = str(db_err)
+            if "string is too long for tsvector" in db_error_text.lower():
+                detail = (
+                    "This PDF contains too much searchable text for the database index. "
+                    "The upload was rolled back; deploy the bounded content-search migration and retry."
+                )
+            else:
+                detail = (
+                    f"Database insert failed: {db_error_text}. Upload rolled back."
+                    if settings.DEBUG
+                    else "Database insert failed. Upload rolled back."
+                )
+            raise HTTPException(status_code=500, detail=detail)
 
     except HTTPException:
         raise
