@@ -12,7 +12,7 @@ export const getRecentStudyActivity = async (userId?: string) => {
   if (userId) {
     const { data: historyData, error: historyError } = await supabase
       .from('study_history')
-      .select('accessed_at, last_page, documents!inner(*)')
+      .select('accessed_at, last_page, documents!inner(*, document_analytics(view_count, upvotes, download_count))')
       .eq('user_id', userId)
       .eq('documents.status', 'approved')
       .order('accessed_at', { ascending: false })
@@ -61,7 +61,7 @@ export const getFullStudyHistory = async (userId?: string) => {
   if (userId) {
     const { data: historyData, error: historyError } = await supabase
       .from('study_history')
-      .select('accessed_at, last_page, documents!inner(*)')
+      .select('accessed_at, last_page, documents!inner(*, document_analytics(view_count, upvotes, download_count))')
       .eq('user_id', userId)
       .gte('accessed_at', fetchStartDate.toISOString())
       .eq('documents.status', 'approved')

@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Download, Eye, Bookmark, Trash2, FileText, NotebookPen, FileQuestion, ListChecks, ThumbsUp, BookOpen, type LucideIcon } from "lucide-react";
+import { Eye, Bookmark, Trash2, FileText, NotebookPen, FileQuestion, ListChecks, ThumbsUp, BookOpen, type LucideIcon } from "lucide-react";
 import { SUBJECT_UI_MAP, normalizeTitle } from "@/app/lib/subject-config";
-import { InlineSpinner } from "@/components/layout/SharedLayouts";
 import type { DocumentWithAnalytics } from "@/app/lib/document-types";
 import { subjectSlug as generateSlug, documentPath } from "@/components/layout/utils";
 import { DiscoveryTooltip } from "@/components/ui/DiscoveryTooltip";
@@ -44,7 +43,7 @@ export interface DocumentCardProps {
   isAdmin?: boolean;
   isSuggestion?: boolean;
   badgeText?: string;
-  onDownload: (e: React.MouseEvent, doc: DocumentWithAnalytics) => void;
+  onDownload?: (e: React.MouseEvent, doc: DocumentWithAnalytics) => void;
   onToggleBookmark?: (id: number) => void;
   onToggleUpvote?: (id: number) => void;
   onDelete?: (id: number) => void;
@@ -62,11 +61,9 @@ export default function DocumentCard({
   isAdmin = false,
   isSuggestion = false,
   badgeText,
-  onDownload,
   onToggleBookmark,
   onToggleUpvote,
   onDelete,
-  isDownloading = false,
   showBookmarkTooltip = false,
   showReadingProgress = false
 }: DocumentCardProps) {
@@ -82,7 +79,7 @@ export default function DocumentCard({
     "border-sky-500": "bg-linear-to-br from-sky-500/5 via-surface to-sky-500/5",
   }[ui.border as string] || "bg-linear-to-br from-primary/5 via-surface to-primary/5";
   const analyticsObj = Array.isArray(doc.document_analytics) ? doc.document_analytics[0] : doc.document_analytics;
-  const viewCount = analyticsObj?.view_count || 0;
+  const viewCount = analyticsObj?.view_count ?? doc.view_count ?? 0;
   const upvoteCount = currentUpvoteCount !== undefined ? currentUpvoteCount : (analyticsObj?.upvotes || 0);
 
   const Icon = CATEGORY_ICONS[doc.category] || FileText;
@@ -185,17 +182,8 @@ export default function DocumentCard({
         )}
       </div>
 
-      {/* Bottom action row: download action plus inline view and upvote counts. */}
+      {/* Bottom action row: view and upvote counts. Downloads are available in fullscreen mode only. */}
       <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 sm:mt-4 sm:pt-4">
-        <button
-          aria-label={isDownloading ? `Downloading ${doc.title}` : `Download ${doc.title}`}
-          title={isDownloading ? "Downloading" : "Download"}
-          onClick={(e) => onDownload(e, doc)}
-          className="motion-hover motion-active inline-flex items-center justify-center rounded-xl border border-border bg-surface-hover p-2 text-sm font-bold text-foreground hover:border-primary/50"
-        >
-          {isDownloading ? <InlineSpinner label="Downloading" size={13} /> : <Download size={15} aria-hidden="true" />}
-        </button>
-
         <Link
           href={docHref}
           aria-label={`View ${doc.title}, ${viewCount} view${viewCount !== 1 ? "s" : ""}`}

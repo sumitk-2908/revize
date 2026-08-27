@@ -12,6 +12,8 @@ export type DocumentAiContent = Database["public"]["Tables"]["document_ai_conten
 
 export type DocumentWithAnalytics = DocumentRecord & {
   last_page?: number | null;
+  /** Flattened analytics value returned by views/RPCs such as trending documents. */
+  view_count?: number | null;
   document_analytics?: Partial<DocumentAnalytics> | Partial<DocumentAnalytics>[] | null;
   document_ai_content?: DocumentAiContent[];
 };
