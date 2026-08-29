@@ -10,11 +10,13 @@ import { AuthModal } from "@/components/layout/modals/AuthModal";
 import { UploadModal } from "@/components/layout/modals/UploadModal";
 import { OnboardingModal } from "@/components/layout/modals/OnboardingModal";
 import { ProfileGateModal } from "@/components/layout/modals/ProfileGateModal";
+import { BackendWarmup } from "@/components/common/BackendWarmup";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <Providers>
+      <BackendWarmup />
       <ErrorBoundary title="Fatal App Error" message="The application shell encountered a critical error. Please reload the page.">
         <AppShell>
           <TopBar />

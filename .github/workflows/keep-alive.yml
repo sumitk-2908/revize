@@ -1,0 +1,25 @@
+name: Keep Backend Alive
+
+on:
+  schedule:
+    # Runs every 14 minutes (Render sleeps after 15 minutes of inactivity)
+    - cron: '*/14 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Backend Probe
+        env:
+          BACKEND_URL: ${{ secrets.RENDER_BACKEND_URL || vars.RENDER_BACKEND_URL || 'https://revize-backend.onrender.com' }}
+        run: |
+          PROBE_URL="${BACKEND_URL%/}/ping"
+          echo "Pinging $PROBE_URL..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$PROBE_URL" || echo "failed")
+          echo "Response HTTP Status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "failed" ]; then
+            echo "Keep-alive ping sent successfully."
+          else
+            echo "Ping responded with status: $HTTP_STATUS (still counts as activity to keep instance awake)"
+          fi

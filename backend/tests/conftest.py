@@ -1,4 +1,11 @@
+import os
 import pytest
+from dotenv import load_dotenv
+
+load_dotenv()
+os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
+os.environ.setdefault("SUPABASE_KEY", "test-key-anon")
+
 from httpx import AsyncClient, ASGITransport
 from fastapi.testclient import TestClient
 from app.main import app
@@ -47,9 +54,11 @@ def mock_auth_header_generator():
     import json
     
     def _gen_token(aal="aal1"):
+        hdr_b64 = base64.urlsafe_b64encode(json.dumps({"alg": "none"}).encode()).decode().rstrip("=")
         payload = {"aal": aal}
         payload_bytes = json.dumps(payload).encode("utf-8")
         payload_b64 = base64.urlsafe_b64encode(payload_bytes).decode("utf-8").rstrip("=")
-        return f"header.{payload_b64}.signature"
+        sig_b64 = base64.urlsafe_b64encode(b"signature").decode("utf-8").rstrip("=")
+        return f"{hdr_b64}.{payload_b64}.{sig_b64}"
         
     return _gen_token

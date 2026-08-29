@@ -64,6 +64,14 @@ app.include_router(documents.router, prefix="/api/v1/documents", tags=["Document
 app.include_router(ai_content.router, prefix="/api/v1/documents", tags=["AI Content"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 
+@app.get("/ping", tags=["Health"])
+@app.get("/api/v1/ping", tags=["Health"])
+@limiter.limit("120/minute")
+async def ping(request: Request):
+    """Ultra-fast keep-alive and pre-warm probe without database roundtrip."""
+    return {"status": "awake", "version": "1.0.0"}
+
+
 @app.get("/health", tags=["Health"])
 @limiter.limit("20/minute")
 async def health_check(request: Request):

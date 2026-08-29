@@ -18,7 +18,28 @@ export const api = axios.create({
   },
 });
 
+let pendingSlowRequests = 0;
+
+const notifyWarmupState = (isWarming: boolean) => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("portal_backend_warming", { detail: { isWarming } })
+    );
+  }
+};
+
 api.interceptors.request.use(async (config) => {
+  // Track slow requests (cold starts take >2.5s)
+  if (typeof window !== "undefined") {
+    const timer = setTimeout(() => {
+      pendingSlowRequests++;
+      notifyWarmupState(true);
+    }, 2500);
+
+    (config as any).__warmupTimer = timer;
+    (config as any).__warmupTriggered = false;
+  }
+
   let { data: { session } } = await supabase.auth.getSession();
   
   if (session?.expires_at && (session.expires_at * 1000) - Date.now() < 60000) {
@@ -31,3 +52,36 @@ api.interceptors.request.use(async (config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => {
+    if (typeof window !== "undefined") {
+      const timer = (response.config as any)?.__warmupTimer;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      if (pendingSlowRequests > 0) {
+        pendingSlowRequests = Math.max(0, pendingSlowRequests - 1);
+        if (pendingSlowRequests === 0) {
+          notifyWarmupState(false);
+        }
+      }
+    }
+    return response;
+  },
+  (error) => {
+    if (typeof window !== "undefined") {
+      const timer = (error.config as any)?.__warmupTimer;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      if (pendingSlowRequests > 0) {
+        pendingSlowRequests = Math.max(0, pendingSlowRequests - 1);
+        if (pendingSlowRequests === 0) {
+          notifyWarmupState(false);
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);

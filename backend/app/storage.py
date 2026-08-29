@@ -24,9 +24,6 @@ import os
 import re
 from typing import Optional
 
-import boto3
-from botocore.config import Config
-
 R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
 R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
@@ -68,6 +65,9 @@ def get_r2_client():
     """Lazily creates a single boto3 S3 client pointed at the R2 endpoint."""
     global _r2_client
     if _r2_client is None:
+        import boto3
+        from botocore.config import Config
+
         _r2_client = boto3.client(
             "s3",
             endpoint_url=f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com",

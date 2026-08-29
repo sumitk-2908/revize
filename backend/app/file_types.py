@@ -13,9 +13,10 @@ import io
 import os
 import zipfile
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING, Any
 
-import fitz
+if TYPE_CHECKING:
+    import fitz
 
 MB = 1024 * 1024
 
@@ -227,7 +228,7 @@ def _ocr_page(image) -> tuple[str, Optional[float]]:
     return text, (sum(confidences) / len(confidences) if confidences else None)
 
 
-def _ocr_pdf(document: fitz.Document, spec: FileSpec, max_chars: int) -> str:
+def _ocr_pdf(document: Any, spec: FileSpec, max_chars: int) -> str:
     """Renders and OCRs each page of an open PDF, skipping unreadable ones."""
     from PIL import Image
 
@@ -302,6 +303,7 @@ def extract_text(
     if spec.kind == "text":
         text = data.decode("utf-8")
     elif spec.kind == "pdf":
+        import fitz
         with fitz.open(stream=data, filetype="pdf") as document:
             text = "\n".join(page.get_text("text") for page in document)
             if len(text.strip()) < _MIN_PDF_TEXT_LAYER_CHARS:

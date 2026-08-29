@@ -1,7 +1,6 @@
 import os
 import re
 import asyncio
-import fitz
 import json
 import base64
 import hashlib
@@ -77,6 +76,8 @@ def extract_pdf_metadata(file_bytes: bytes):
     background thread without blocking FastAPI's event loop.
     Returns (page_count, thumbnail_jpeg_bytes).
     """
+    import fitz
+
     pdf_document = fitz.open(stream=file_bytes, filetype="pdf")
     page_count = len(pdf_document)
     first_page = pdf_document.load_page(0)
@@ -90,6 +91,8 @@ def render_image_thumbnail(file_bytes: bytes, ext: str) -> bytes:
     Downscales an uploaded image to a card-sized JPEG thumbnail.
     Synchronous and CPU-bound, so callers run it via asyncio.to_thread.
     """
+    import fitz
+
     image_doc = fitz.open(stream=file_bytes, filetype=ext)
     page = image_doc.load_page(0)
     longest_edge = max(page.rect.width, page.rect.height, 1)

@@ -1,7 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import * as Toast from "@radix-ui/react-toast";
-import { Mail, WifiOff } from "lucide-react";
+import { Mail, WifiOff, Loader2, Sparkles } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { useSidebar } from "@/app/context/SidebarContext";
 import { useNotifications } from "@/app/context/NotificationsContext";
@@ -11,9 +12,28 @@ export const BannersAndToasts = () => {
   const { isStudent, emailConfirmed, sendVerificationEmail } = useAuth();
   const { isOffline } = useSidebar();
   const { activeToast, setActiveToast, globalToast, setGlobalToast } = useNotifications();
+  const [isBackendWarming, setIsBackendWarming] = useState(false);
+
+  useEffect(() => {
+    const handleWarming = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (typeof detail?.isWarming === "boolean") {
+        setIsBackendWarming(detail.isWarming);
+      }
+    };
+
+    window.addEventListener("portal_backend_warming", handleWarming);
+    return () => window.removeEventListener("portal_backend_warming", handleWarming);
+  }, []);
 
   return (
     <>
+      {isBackendWarming && (
+        <div className="z-50 flex items-center justify-center gap-2 border-b border-primary/20 bg-primary/10 px-4 py-2 text-center text-xs font-semibold text-primary transition-all">
+          <Loader2 size={14} className="animate-spin text-primary" />
+          <span>Connecting to server... Waking up free-tier backend (~15-20s)</span>
+        </div>
+      )}
       {isStudent && !emailConfirmed && (
         <div className="z-50 flex items-center justify-center gap-2 bg-warning/10 px-4 py-2 text-center text-xs font-semibold text-warning">
           <Mail size={14} /><span>Please verify your email address to unlock upload privileges.</span>
