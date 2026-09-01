@@ -21,17 +21,6 @@ A crowd-sourced academic resource hub for engineering students: notes, previous-
 
 → [Full feature list](docs/FEATURES.md)
 
-## Screenshots
-
-The repository contains PWA screenshot references in `frontend/public/manifest.json`, but matching screenshot files are not currently present in the checked-in public assets. Add captures here when they are available:
-
-| View | Placeholder |
-| --- | --- |
-| Public discovery and trending resources | `docs/screenshots/home.png` *(pending)* |
-| Subject/module resource listing | `docs/screenshots/subject-module.png` *(pending)* |
-| Document viewer with comments | `docs/screenshots/pdf-viewer.png` *(pending)* |
-| Student profile and study activity | `docs/screenshots/profile.png` *(pending)* |
-| Administrator moderation inbox | `docs/screenshots/admin-inbox.png` *(pending)* |
 
 ## Quick Start
 
