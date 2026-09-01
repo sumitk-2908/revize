@@ -6,10 +6,9 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](frontend/package.json)
 [![Python CI](https://img.shields.io/badge/Python_CI-3.11-3776AB?logo=python&logoColor=white)](.github/workflows/ci.yml)
 [![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 A crowd-sourced academic resource hub for engineering students: notes, previous-year questions, syllabi, and tutorial sheets organized by subject and module, with public discovery, authenticated contributions, peer moderation, and personal study tools.
-
-> **Project status:** Active application code is present, but this repository does not currently include a root project license. See [License](#license).
 
 ## What It Does
 
@@ -67,8 +66,7 @@ Open `http://localhost:3000`. The API is available at `http://localhost:8000`, w
 | [Deployment](docs/DEPLOYMENT.md) | Supabase, Cloudflare R2, Render, and Vercel deployment |
 | [Testing](docs/TESTING.md) | Backend Pytest, Playwright E2E, continuous integration |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common failures and FAQ |
-| [Security and Operations](docs/SECURITY.md) | RLS, MFA, upload validation, rate limits, secrets |
-| [Roadmap and Contributing](docs/ROADMAP.md) | Maintenance opportunities and contribution workflow |
+| [Contributing](docs/CONTRIBUTING.md) | Contribution workflow, PR guidelines, and local verification |
 
 ## Tech Stack
 
@@ -92,8 +90,8 @@ Backend tests run with `python -m pytest tests -q` from `backend/`; frontend E2E
 
 Fork the repository, branch from `main`, record schema changes as migrations, keep secrets out of commits, and run lint/build/tests before opening a pull request.
 
-→ [Contributing guide](docs/ROADMAP.md#contributing)
+→ [Contributing guide](docs/CONTRIBUTING.md)
 
 ## License
 
-No project-level `LICENSE` file or package license declaration was detected in the repository. Until the project owner adds a license, the code should not be assumed to grant permission for redistribution, modification, or commercial use. Third-party dependencies retain their own licenses.
+This project is open-source and licensed under the [MIT License](LICENSE). Third-party dependencies retain their own licenses.
