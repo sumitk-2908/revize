@@ -153,3 +153,20 @@ export function buildDownloadHref(
   const separator = fileUrl.includes("?") ? "&" : "?";
   return `${fileUrl}${separator}download=${encodeURIComponent(buildDownloadFilename(fileUrl, title))}`;
 }
+
+/**
+ * Href for viewing a document in a new tab.
+ *
+ * For Microsoft Office files (.docx, .pptx, .xlsx) which browsers cannot natively
+ * display, this routes through Microsoft Office Online Viewer so users can preview
+ * and read the document directly in the browser instead of triggering an automatic download.
+ */
+export function buildViewInNewTabHref(fileUrl: string | null | undefined): string {
+  if (!fileUrl) return "#";
+  const kind = getFileKind(fileUrl);
+  if (kind === "office") {
+    return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fileUrl)}`;
+  }
+  return fileUrl;
+}
+

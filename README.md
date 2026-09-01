@@ -1,4 +1,4 @@
-# Academic Portal
+# Revize
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.2.7-000000?logo=next.js&logoColor=white)](frontend/package.json)
 [![React](https://img.shields.io/badge/React-19.2.4-61DAFB?logo=react&logoColor=111111)](frontend/package.json)

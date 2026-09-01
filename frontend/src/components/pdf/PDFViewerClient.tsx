@@ -24,7 +24,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { InlineSpinner, SkeletonBlock } from "@/components/layout/SharedLayouts";
 import { dispatchToast as showToast } from "@/app/lib/toast";
-import { buildDownloadFilename, buildDownloadHref, getExtension, getFileKind, getFileLabel } from "@/app/lib/file-types";
+import { buildDownloadFilename, buildDownloadHref, buildViewInNewTabHref, getExtension, getFileKind, getFileLabel } from "@/app/lib/file-types";
 import { ensureDownloadAuth } from "@/app/lib/auth-prompts";
 import { usePdfTextSearch } from "./usePdfTextSearch";
 
@@ -598,10 +598,9 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
   };
 
   const handleOpenFile = (e: React.MouseEvent) => {
-    // Opening the raw storage URL is public and must never be treated as a download.
-    if (!canZoom) return;
     e.preventDefault();
-    window.open(documentMeta.file_url, "_blank", "noopener,noreferrer");
+    if (!documentMeta?.file_url) return;
+    window.open(buildViewInNewTabHref(documentMeta.file_url), "_blank", "noopener,noreferrer");
   };
 
   const handleDownloadClick = async (e: React.MouseEvent) => {
@@ -719,7 +718,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
                   <ToolTip label={userRating ? "Remove upvote" : "Upvote document"}><button aria-label={userRating ? "Remove upvote" : "Upvote document"} aria-pressed={userRating === true} onClick={handleToggleUpvote} className={`${TOOLBAR_BUTTON} ${userRating ? 'bg-success/15 text-success hover:bg-success/25' : ''}`}><ThumbsUp size={18} className={userRating ? 'fill-success' : ''} /></button></ToolTip>
                   <ToolTip label="Report an issue"><button aria-label="Report document" onClick={() => setIsFlagModalOpen(true)} className={TOOLBAR_BUTTON}><Flag size={18} /></button></ToolTip>
                   <DropdownMenu.Root><ToolTip label="Share"><DropdownMenu.Trigger asChild><button aria-label="Share document" className={TOOLBAR_BUTTON}><Share2 size={18} /></button></DropdownMenu.Trigger></ToolTip><DropdownMenu.Portal><DropdownMenu.Content className="z-50 min-w-36 overflow-hidden rounded-lg bg-zinc-900 p-1 shadow-xl ring-1 ring-white/10" align="end" sideOffset={6}><DropdownMenu.Item onClick={handleCopyLink} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-zinc-200 outline-none hover:bg-white/10">{copied ? <Check size={14} className="text-emerald-400" /> : <LinkIcon size={14} />}{copied ? 'Copied' : 'Copy link'}</DropdownMenu.Item><DropdownMenu.Item onClick={handleWhatsAppShare} className="flex cursor-pointer items-center gap-2 rounded-md p-2 text-xs font-semibold text-emerald-400 outline-none hover:bg-white/10">WhatsApp</DropdownMenu.Item></DropdownMenu.Content></DropdownMenu.Portal></DropdownMenu.Root>
-                  {canZoom ? <ToolTip label="Fullscreen"><button ref={fullscreenTriggerRef} aria-label="Open in fullscreen reader" onClick={() => setIsFullscreen(true)} className={TOOLBAR_BUTTON}><Maximize size={18} /></button></ToolTip> : <ToolTip label="Open file"><a aria-label="Open file" href={documentMeta.file_url} target="_blank" rel="noopener noreferrer" onClick={handleOpenFile} className={TOOLBAR_BUTTON}><Maximize size={18} /></a></ToolTip>}
+                  {canZoom ? <ToolTip label="Fullscreen"><button ref={fullscreenTriggerRef} aria-label="Open in fullscreen reader" onClick={() => setIsFullscreen(true)} className={TOOLBAR_BUTTON}><Maximize size={18} /></button></ToolTip> : <ToolTip label="Open file"><a aria-label="Open file" href={buildViewInNewTabHref(documentMeta?.file_url)} target="_blank" rel="noopener noreferrer" onClick={handleOpenFile} className={TOOLBAR_BUTTON}><Maximize size={18} /></a></ToolTip>}
                 </div>
               </header>
 
@@ -927,7 +926,7 @@ export default function PDFViewerClient({ documentMeta }: { documentMeta: any })
                     <Download size={16} aria-hidden="true" /> Download
                   </a>
                   <a
-                    href={documentMeta.file_url}
+                    href={buildViewInNewTabHref(documentMeta?.file_url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="motion-hover motion-active flex items-center gap-2 rounded-xl bg-surface-hover px-4 py-2.5 text-sm font-bold text-foreground"
